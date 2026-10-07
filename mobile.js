@@ -368,6 +368,6 @@ $('#settings').onclick = openSettings;
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // 앱으로 돌아왔을 때: 오늘을 보고 있을 때만 다시 확인 (지난 날짜를 직접 골라 보고 있으면 그대로 둠)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#dateSel').value === todayStr()) init(false); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
 init();
 setTimeout(() => loadFace(), 0);
