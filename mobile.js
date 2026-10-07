@@ -310,15 +310,15 @@ async function init(force = false) {
     posts = store.get('posts') || [];
     try { await fetchList(); } catch (e) { if (!posts.length) throw e; status('인터넷 연결을 확인하세요. 저장된 내용을 보여드려요.', true); }
     fillSelect();
-    const sel = $('#dateSel').value;
-    await show(force && sel ? sel : todayStr(), false);
+    await show(todayStr(), false);   // 처음 열 때·새로고침 → 오늘
   } catch (e) { status(e.message, true); }
 }
 $('#dateSel').onchange = (e) => show(e.target.value);
 $('#refresh').onclick = () => init(true);
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
 $('#settings').onclick = askKey;
-document.addEventListener('visibilitychange', () => { if (!document.hidden) init(false); });   // 앱으로 돌아오면 다시 확인
+// 앱으로 돌아왔을 때: 오늘을 보고 있을 때만 다시 확인 (지난 날짜를 직접 골라 보고 있으면 그대로 둠)
+document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#dateSel').value === todayStr()) init(false); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 init();
 setTimeout(() => loadFace(), 0);
