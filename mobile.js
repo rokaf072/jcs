@@ -172,17 +172,39 @@ function openPicker(g, ph) {
   close.onclick = () => ov.remove(); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
   box.append(grid, close); ov.append(box); document.body.append(ov);
   const ident = (store.get('auto:' + g.name + '|' + g.role) || {}).desc;
+  const pickUrl = async (url, scan) => {
+    ov.remove();
+    const a = await analyze(scan || url);
+    const rec = { url, alt: scan, ...(a && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
+    store.set('manual:' + g.name, rec); setPhoto(ph, rec, g.name);
+  };
+  // 직접 등록: 구글/네이버에서 찾기, 이미지 주소 붙여넣기, 갤러리 사진 선택
+  const q = encodeURIComponent(`${g.name} ${g.role}`.trim());
+  const bar = el('div', 'mbar');
+  const r1 = el('div', 'mrow');
+  const ga = el('a', null, '구글에서 찾기'); ga.href = 'https://www.google.com/search?udm=2&q=' + q; ga.target = '_blank';
+  const na = el('a', null, '네이버에서 찾기'); na.href = 'https://m.search.naver.com/search.naver?where=m_image&query=' + q; na.target = '_blank';
+  const file = document.createElement('input'); file.type = 'file'; file.accept = 'image/*'; file.style.display = 'none';
+  file.onchange = async () => {
+    const f = file.files[0]; if (!f) return;
+    const bmp = await createImageBitmap(f); const k = Math.min(1, 480 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    pickUrl(c.toDataURL('image/jpeg', 0.85));
+  };
+  const fb = el('button', null, '갤러리 사진'); fb.onclick = () => file.click();
+  r1.append(ga, na, fb, file);
+  const r2 = el('div', 'mrow'); const inp = document.createElement('input'); inp.placeholder = '이미지 주소 붙여넣기';
+  const okb = el('button', 'primary', '등록'); okb.onclick = () => { const u = inp.value.trim(); if (/^https?:/.test(u)) pickUrl(u); else inp.focus(); };
+  r2.append(inp, okb);
+  bar.append(el('div', 'mtitle', '원하는 사진이 없으면 직접 등록'), r1, r2, el('div', 'mhelp', '찾은 사진을 길게 눌러 "이미지 주소 복사" 후 붙여넣거나, 사진을 저장해서 [갤러리 사진]으로 고르세요.'));
+  box.insertBefore(bar, grid);
   const section = (t) => { const w = el('div', 'pmsg', '찾는 중…'), end = el('div', 'pend'); grid.append(el('div', 'psec', t), w, end); return { w, end }; };
   const add = (sec, it) => {
     const wrap = el('div', 'pitem'), im = document.createElement('img');
     im.referrerPolicy = 'no-referrer'; im.src = it.thumb || it.url;
     im.onerror = () => wrap.remove();
-    im.onclick = async () => {
-      ov.remove();
-      const a = await analyze(it.thumb);
-      const rec = { url: it.url, alt: it.thumb, ...(a && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
-      store.set('manual:' + g.name, rec); setPhoto(ph, rec, g.name);
-    };
+    im.onclick = () => pickUrl(it.url, it.thumb);
     wrap.append(im);
     if (it.date) wrap.append(el('span', 'pdate', it.date));
     sec.end.before(wrap);
