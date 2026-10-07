@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a9a8a">
+<title>정치쇼 출연자</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root { --ink:#1b2a27; --sub:#5b6b67; --line:#d9e3e0; --bg:#f4f7f6; --card:#fff; --brand:#3a9a8a; --brand-d:#2a7466; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif; color:var(--ink); background:var(--bg); }
+  header { position:sticky; top:0; z-index:5; background:var(--brand); color:#fff; padding:10px 14px calc(10px) ; padding-top:calc(10px + env(safe-area-inset-top)); }
+  .row1 { display:flex; align-items:center; gap:8px; }
+  header h1 { font-size:17px; margin:0; font-weight:800; flex:1; }
+  .row2 { display:flex; gap:8px; margin-top:8px; }
+  select, button { font:inherit; font-size:15px; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.7); background:#fff; color:var(--ink); }
+  .row2 select { flex:1; min-width:0; }
+  .icon-btn { background:transparent; color:#fff; border:none; font-size:20px; padding:4px 6px; }
+  #status { padding:6px 14px; font-size:12.5px; color:var(--sub); min-height:18px; }
+  #status.err { color:#b3261e; font-weight:600; }
+  main { padding:0 12px 40px; max-width:1100px; margin:0 auto; }
+  .summary { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:6px 0 14px; font-size:15px; line-height:1.7; }
+  .summary b { color:var(--brand-d); }
+  .part h2 { margin:0 0 8px; font-size:18px; display:flex; align-items:baseline; gap:8px; border-bottom:3px solid var(--brand); padding-bottom:5px; }
+  .part h2 .time { font-size:15px; color:var(--brand-d); }
+  .part { margin-bottom:18px; }
+  .corner { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .cname { font-weight:800; font-size:16px; }
+  .topic { color:var(--sub); font-size:13.5px; margin-top:3px; line-height:1.45; }
+  .guests { display:grid; grid-template-columns:1fr; gap:10px; margin-top:10px; }
+  @media (min-width:600px) { .guests { grid-template-columns:1fr 1fr; } }      /* 폴드 펼쳤을 때 2열 */
+  @media (min-width:900px) { .guests { grid-template-columns:1fr 1fr 1fr; } }
+  .guest { display:flex; gap:12px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:8px; }
+  .photo { width:120px; height:150px; border-radius:8px; background:#e6eeec; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:34px; font-weight:800; color:var(--brand-d); overflow:hidden; }
+  .photo img { width:100%; height:100%; object-fit:cover; object-position:center 20%; }
+  .photo.unsure { border:2px dashed #f0b429; background:#fff8e6; }
+  .photo .need { font-size:11px; color:#8a5a00; font-weight:700; margin-top:4px; }
+  .gname { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+  .grole { font-size:15px; color:var(--sub); margin-top:2px; }
+  .gtools { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+  .gtools button, .gtools a { font-size:13px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--sub); text-decoration:none; }
+  .gtools .latest { background:var(--brand); color:#fff; border-color:var(--brand); font-weight:700; }
+  .waiting { background:#fff8e6; border:2px solid #f0b429; border-radius:14px; padding:24px 18px; margin:14px 0; text-align:center; }
+  .whead { font-size:21px; font-weight:800; color:#8a5a00; }
+  .wtext { font-size:15px; margin-top:10px; line-height:1.6; }
+  .wtime { font-size:12.5px; margin-top:12px; color:var(--sub); }
+  .raw summary { color:var(--sub); font-size:13px; }
+  .raw pre { white-space:pre-wrap; background:#fff; border:1px solid var(--line); padding:10px; border-radius:8px; font-size:13px; }
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+  .picker { background:#fff; border-radius:16px 16px 0 0; padding:16px; width:100%; max-width:760px; max-height:88vh; overflow:auto; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  .ptitle { font-size:18px; font-weight:800; }
+  .psub { font-size:12.5px; color:var(--sub); margin:3px 0 10px; }
+  .pgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  @media (min-width:600px) { .pgrid { grid-template-columns:repeat(4,1fr); } }
+  .psec { grid-column:1/-1; font-weight:800; font-size:14px; margin-top:6px; color:var(--brand-d); }
+  .pitem { position:relative; }
+  .pitem img { width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:8px; background:#eee; }
+  .pdate { position:absolute; left:5px; bottom:6px; background:rgba(0,0,0,.65); color:#fff; font-size:10.5px; padding:1px 5px; border-radius:4px; }
+  .pbadge { position:absolute; right:5px; top:5px; background:#b3261e; color:#fff; font-size:10.5px; padding:1px 5px; border-radius:4px; }
+  .pbadge.same { background:#2a7466; }
+  .pitem.noface img { opacity:.3; }
+  .pmsg { grid-column:1/-1; padding:24px; text-align:center; color:var(--sub); }
+  .pend { display:none; }
+  .pclose { width:100%; margin-top:12px; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <div class="row1">
+    <h1>김태현의 정치쇼 출연자</h1>
+    <button class="icon-btn" id="settings" title="설정">⚙</button>
+  </div>
+  <div class="row2">
+    <select id="dateSel"></select>
+    <button id="refresh">새로고침</button>
+    <button id="openPost">원문</button>
+  </div>
+</header>
+<div id="status"></div>
+<main id="main"></main>
+<script src="lib/face-api.js"></script>
+<script src="parser.js"></script>
+<script src="mobile.js"></script>
+</body>
+</html>
