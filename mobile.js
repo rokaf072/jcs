@@ -133,6 +133,7 @@ async function limited(fn) {
   try { return await fn(); } finally { photoBusy--; const n = photoWait.shift(); if (n) n(); }
 }
 async function getPhoto(g, onUpdate) {
+  if (store.get('none:' + g.name)) return { url: '' };   // 사용자가 지운 사진은 자동으로 다시 채우지 않음
   const manual = store.get('manual:' + g.name);
   if (manual) return manual;
   const key = 'auto:' + g.name + '|' + g.role;
@@ -176,7 +177,7 @@ function openPicker(g, ph) {
     ov.remove();
     const a = await analyze(scan || url);
     const rec = { url, alt: scan, ...(a && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
-    store.set('manual:' + g.name, rec); setPhoto(ph, rec, g.name);
+    store.set('manual:' + g.name, rec); store.del('none:' + g.name); setPhoto(ph, rec, g.name);
   };
   // 직접 등록: 구글/네이버에서 찾기, 이미지 주소 붙여넣기, 갤러리 사진 선택
   const q = encodeURIComponent(`${g.name} ${g.role}`.trim());
@@ -254,7 +255,12 @@ function render(post) {
         const tools = el('div', 'gtools'), b = el('button', 'latest', '사진 고르기');
         b.onclick = () => openPicker(g, ph); ph.onclick = () => openPicker(g, ph);
         const a = el('a', null, '검색'); a.href = 'https://m.search.naver.com/search.naver?query=' + encodeURIComponent(`${g.name} ${g.role}`); a.target = '_blank';
-        tools.append(b, a); info.append(tools);
+        const del = el('button', 'del', '사진 지우기');
+        del.onclick = () => {
+          if (!confirm(`${g.name} 사진을 지울까요?\n[사진 고르기]로 새로 고를 때까지 비워둬요.`)) return;
+          store.del('manual:' + g.name); store.set('none:' + g.name, true); setPhoto(ph, {}, g.name);
+        };
+        tools.append(b, del, a); info.append(tools);
         card.append(ph, info); grid.append(card);
         getPhoto({ ...g, topic: c.topic }, (r) => setPhoto(ph, r, g.name)).then((r) => setPhoto(ph, r, g.name));
       }
@@ -316,7 +322,50 @@ async function init(force = false) {
 $('#dateSel').onchange = (e) => show(e.target.value);
 $('#refresh').onclick = () => init(true);
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
-$('#settings').onclick = askKey;
+// ───────── 설정: 카카오 키 / 사진 백업 / 사진 복원 ─────────
+function exportPhotos() {
+  const photos = {}, none = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) photos[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy }; }
+    if (k.startsWith('gb:none:')) none.push(k.slice(8));
+  }
+  return { app: 'jcs-photos', version: 1, savedAt: new Date().toISOString(), photos, none };
+}
+function importPhotos(data) {
+  if (!data || data.app !== 'jcs-photos') throw new Error('정치쇼 사진 백업 파일이 아니에요.');
+  for (const [name, p] of Object.entries(data.photos || {})) { store.set('manual:' + name, p); store.del('none:' + name); }
+  for (const name of data.none || []) if (!(data.photos || {})[name]) store.set('none:' + name, true);
+  return Object.keys(data.photos || {}).length;
+}
+function openSettings() {
+  const ov = el('div', 'overlay'), box = el('div', 'picker');
+  box.append(el('div', 'ptitle', '설정'));
+  const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); };
+  row('카카오 키 입력', kakaoKey() ? '입력됨 · 바꾸려면 누르세요' : '사진 검색에 필요해요', askKey);
+  row('사진 백업', '직접 고른 사진을 파일로 저장 (다운로드 폴더)', () => {
+    const data = exportPhotos(), n = Object.keys(data.photos).length;
+    if (!n) { alert('직접 고른 사진이 아직 없어요.'); return; }
+    const d = new Date(), a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+    a.download = `정치쇼사진백업_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`; a.click();
+    status(`사진 ${n}명분을 백업 파일로 저장했어요. (다운로드 폴더)`);
+  });
+  row('사진 복원', '백업 파일에서 사진 되살리기 (PC 백업 파일도 가능)', () => {
+    const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json';
+    f.onchange = async () => {
+      try { const n = importPhotos(JSON.parse(await f.files[0].text())); if (current) render(current); status(`사진 ${n}명분을 되살렸어요.`); }
+      catch (e) { status(e.message, true); }
+    };
+    f.click();
+  });
+  const close = el('button', 'pclose', '닫기'); close.onclick = () => ov.remove();
+  box.append(close); ov.append(box); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  document.body.append(ov);
+}
+$('#settings').onclick = openSettings;
+// 휴대폰이 저장 공간이 부족할 때 사진을 함부로 지우지 않도록 요청
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // 앱으로 돌아왔을 때: 오늘을 보고 있을 때만 다시 확인 (지난 날짜를 직접 골라 보고 있으면 그대로 둠)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#dateSel').value === todayStr()) init(false); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
