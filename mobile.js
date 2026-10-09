@@ -150,6 +150,7 @@ async function getPhoto(g, onUpdate) {
     if (myGen !== photoGen) return rec;
     rec.at = Date.now();
     store.set(key, rec);
+    if (rec.url && store.get('ghToken')) schedulePush(false);   // 폰에서 찾은 사진도 PC로
     return rec;
   });
   if (cached && cached.url) { job.then((r) => onUpdate && r.url !== cached.url && onUpdate(r)); return cached; }
@@ -182,6 +183,7 @@ function openPicker(g, ph) {
     const a = await analyze(scan || url);
     const rec = { url, alt: scan, ...(a && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
     store.set('manual:' + g.name, rec); store.del('none:' + g.name); setPhoto(ph, rec, g.name);
+    if (store.get('ghToken')) schedulePush(true); else store.set('localEdit', new Date().toISOString());
   };
   // 직접 등록: 구글/네이버에서 찾기, 이미지 주소 붙여넣기, 갤러리 사진 선택
   const q = encodeURIComponent(`${g.name} ${g.role}`.trim());
@@ -264,6 +266,7 @@ function render(post) {
         del.onclick = () => {
           if (!confirm(`${g.name} 사진을 지울까요?\n[사진 고르기]로 새로 고를 때까지 비워둬요.`)) return;
           store.del('manual:' + g.name); store.set('none:' + g.name, true); setPhoto(ph, {}, g.name);
+          if (store.get('ghToken')) schedulePush(true); else store.set('localEdit', new Date().toISOString());
         };
         tools.append(b, del, a); info.append(tools);
         card.append(ph, info); grid.append(card);
@@ -319,7 +322,10 @@ async function show(date, force = false) {
 async function init(force = false) {
   try {
     posts = store.get('posts') || [];
-    try { await fetchList(); } catch (e) { if (!posts.length) throw e; status('인터넷 연결을 확인하세요. 저장된 내용을 보여드려요.', true); }
+    await Promise.all([
+      fetchList().catch((e) => { if (!posts.length) throw e; status('인터넷 연결을 확인하세요. 저장된 내용을 보여드려요.', true); }),
+      Promise.race([syncPull(true), new Promise((r) => setTimeout(r, 4000))]),   // PC에서 고른 사진 받아오기
+    ]);
     fillSelect();
     await show(todayStr(), false);   // 처음 열 때·새로고침 → 오늘
   } catch (e) { status(e.message, true); }
@@ -346,11 +352,65 @@ function importPhotos(data) {
   for (const name of data.none || []) if (!(data.photos || {})[name]) store.set('none:' + name, true);
   return Object.keys(data.photos || {}).length;
 }
+
+const syncGet = async (k) => store.get(k);
+const syncSet = async (k, v) => store.set(k, v);
+async function getGhToken() { return store.get('ghToken') || ''; }
+
+// ───────── PC ↔ 휴대폰 사진 자동 연동 (GitHub jcs 저장소의 photos.json) ─────────
+const SYNC_URL = 'https://api.github.com/repos/rokaf072/jcs/contents/photos.json';
+function utf8b64(str) {
+  const bytes = new TextEncoder().encode(str); let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+let pushTimer = null;
+async function syncPull(silent) {
+  try {
+    const tok = await getGhToken();
+    const res = await fetch(SYNC_URL, { cache: 'no-store', headers: { Accept: 'application/vnd.github.raw+json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) } });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const seen = (await syncGet('syncSeen')) || '', edit = (await syncGet('localEdit')) || '';
+    if (!data.savedAt || data.savedAt <= seen || data.savedAt <= edit) return false;   // 이미 받았거나 내 쪽이 더 최신
+    const n = await importPhotos(data);
+    await syncSet('syncSeen', data.savedAt);
+    if (!silent) status(`연동된 사진 ${n}명분을 받아왔어요.`);
+    return true;
+  } catch (e) { return false; }
+}
+async function syncPush() {
+  const tok = await getGhToken();
+  if (!tok) return false;
+  const data = await exportPhotos();
+  const h = { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json' };
+  let sha;
+  const cur = await fetch(SYNC_URL, { cache: 'no-store', headers: h });
+  if (cur.ok) sha = (await cur.json()).sha;
+  const res = await fetch(SYNC_URL, { method: 'PUT', headers: h,
+    body: JSON.stringify({ message: '사진 연동 ' + data.savedAt, content: utf8b64(JSON.stringify(data)), ...(sha ? { sha } : {}) }) });
+  if (!res.ok) throw new Error(res.status === 401 || res.status === 403 || res.status === 404 ? 'GitHub 키가 맞지 않아요. 키를 다시 입력해 주세요.' : '연동 업로드 실패 (' + res.status + ')');
+  await syncSet('syncSeen', data.savedAt);
+  return Object.keys(data.photos).length;
+}
+function schedulePush(edited) {
+  if (edited) syncSet('localEdit', new Date().toISOString());
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => syncPush().then((n) => { if (n) status(`사진 ${n}명분을 폰과 연동했어요.`); }).catch((e) => status(e.message, true)), 3000);
+}
 function openSettings() {
   const ov = el('div', 'overlay'), box = el('div', 'picker');
   box.append(el('div', 'ptitle', '설정'));
   const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); };
   row('카카오 키 입력', kakaoKey() ? '입력됨 · 바꾸려면 누르세요' : '사진 검색에 필요해요', askKey);
+  row('PC 사진 지금 받아오기', 'PC에서 고른 사진을 바로 가져와요 (앱을 열 때도 자동)', async () => {
+    status('PC 사진 확인 중…');
+    const got = await syncPull(false); if (got && current) render(current); if (!got) status('새로 받을 사진이 없어요. (이미 최신)');
+  });
+  row('폰에서 고른 사진도 PC로 보내기', store.get('ghToken') ? '켜짐 · GitHub 키 입력됨' : 'GitHub 키를 입력하면 폰에서 고른 사진도 PC에 연동돼요', () => {
+    const t = prompt('GitHub 키를 붙여넣으세요. (비우면 끄기)', store.get('ghToken') || ''); if (t === null) return;
+    if (t.trim()) { store.set('ghToken', t.trim()); schedulePush(false); } else store.del('ghToken');
+  });
   row('사진 백업', '지금 보이는 사진을 파일로 저장 (다운로드 폴더)', () => {
     const data = exportPhotos(), n = Object.keys(data.photos).length;
     if (!n) { alert('저장할 사진이 아직 없어요.'); return; }
