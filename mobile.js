@@ -127,6 +127,7 @@ async function identify(g) {
   return { url: m.src.show, alt: m.src.alt, cx: m.cx, cy: m.cy, desc: best.desc };
 }
 let photoBusy = 0; const photoWait = [];
+let photoGen = 0;
 async function limited(fn) {
   if (photoBusy >= 3) await new Promise((r) => photoWait.push(r));
   photoBusy++;
@@ -140,10 +141,13 @@ async function getPhoto(g, onUpdate) {
   const cached = store.get(key);
   if (cached && Date.now() - cached.at < (cached.url ? 14 * 86400000 : 6 * 3600000)) return cached;   // 찾은 사진은 2주 유지
   if (!kakaoKey()) return cached || { url: '' };
+  const myGen = photoGen;
   const job = limited(async () => {
+    if (myGen !== photoGen) return cached || { url: '' };
     let rec = { url: '' };
     try { rec = await identify(g); } catch (e) {}
     if (!rec.url && cached && cached.url) rec = { ...cached };
+    if (myGen !== photoGen) return rec;
     rec.at = Date.now();
     store.set(key, rec);
     return rec;
@@ -227,6 +231,7 @@ function askKey() {
 
 // ───────── 화면 ─────────
 function render(post) {
+  photoGen++;
   current = post;
   const main = $('#main'); main.textContent = '';
   const sum = el('div', 'summary');
@@ -324,13 +329,16 @@ $('#refresh').onclick = () => init(true);
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
 // ───────── 설정: 카카오 키 / 사진 백업 / 사진 복원 ─────────
 function exportPhotos() {
-  const photos = {}, none = [];
+  const photos = {}, none = [], manual = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) photos[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy }; }
+    if (k.startsWith('gb:auto:')) { const r = store.get(k.slice(3)); if (r && r.url) photos[k.slice(8).split('|')[0]] = { url: r.url, cx: r.cx, cy: r.cy }; }
+    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) manual[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy }; }
     if (k.startsWith('gb:none:')) none.push(k.slice(8));
   }
-  return { app: 'jcs-photos', version: 1, savedAt: new Date().toISOString(), photos, none };
+  Object.assign(photos, manual);
+  for (const n of none) delete photos[n];
+  return { app: 'jcs-photos', version: 2, savedAt: new Date().toISOString(), photos, none };
 }
 function importPhotos(data) {
   if (!data || data.app !== 'jcs-photos') throw new Error('정치쇼 사진 백업 파일이 아니에요.');
@@ -343,9 +351,9 @@ function openSettings() {
   box.append(el('div', 'ptitle', '설정'));
   const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); };
   row('카카오 키 입력', kakaoKey() ? '입력됨 · 바꾸려면 누르세요' : '사진 검색에 필요해요', askKey);
-  row('사진 백업', '직접 고른 사진을 파일로 저장 (다운로드 폴더)', () => {
+  row('사진 백업', '지금 보이는 사진을 파일로 저장 (다운로드 폴더)', () => {
     const data = exportPhotos(), n = Object.keys(data.photos).length;
-    if (!n) { alert('직접 고른 사진이 아직 없어요.'); return; }
+    if (!n) { alert('저장할 사진이 아직 없어요.'); return; }
     const d = new Date(), a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     a.download = `정치쇼사진백업_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`; a.click();
