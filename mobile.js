@@ -150,7 +150,7 @@ async function getPhoto(g, onUpdate) {
     if (myGen !== photoGen) return rec;
     rec.at = Date.now();
     store.set(key, rec);
-    if (rec.url && store.get('ghToken')) schedulePush(false);   // 폰에서 찾은 사진도 PC로
+    if (rec.url) schedulePush();   // 폰에서 찾은 사진도 PC로
     return rec;
   });
   if (cached && cached.url) { job.then((r) => onUpdate && r.url !== cached.url && onUpdate(r)); return cached; }
@@ -181,9 +181,9 @@ function openPicker(g, ph) {
   const pickUrl = async (url, scan) => {
     ov.remove();
     const a = await analyze(scan || url);
-    const rec = { url, alt: scan, ...(a && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
+    const rec = { url, alt: scan, t: Date.now(), ...(a && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
     store.set('manual:' + g.name, rec); store.del('none:' + g.name); setPhoto(ph, rec, g.name);
-    if (store.get('ghToken')) schedulePush(true); else store.set('localEdit', new Date().toISOString());
+    schedulePush();
   };
   // 직접 등록: 구글/네이버에서 찾기, 이미지 주소 붙여넣기, 갤러리 사진 선택
   const q = encodeURIComponent(`${g.name} ${g.role}`.trim());
@@ -265,8 +265,8 @@ function render(post) {
         const del = el('button', 'del', '사진 지우기');
         del.onclick = () => {
           if (!confirm(`${g.name} 사진을 지울까요?\n[사진 고르기]로 새로 고를 때까지 비워둬요.`)) return;
-          store.del('manual:' + g.name); store.set('none:' + g.name, true); setPhoto(ph, {}, g.name);
-          if (store.get('ghToken')) schedulePush(true); else store.set('localEdit', new Date().toISOString());
+          store.del('manual:' + g.name); store.set('none:' + g.name, Date.now()); setPhoto(ph, {}, g.name);
+          schedulePush();
         };
         tools.append(b, del, a); info.append(tools);
         card.append(ph, info); grid.append(card);
@@ -334,23 +334,58 @@ $('#dateSel').onchange = (e) => show(e.target.value);
 $('#refresh').onclick = () => init(true);
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
 // ───────── 설정: 카카오 키 / 사진 백업 / 사진 복원 ─────────
+
+// ───────── 사진 합치기 규칙 (백업·연동 공통) ─────────
+// 형식: { photos:{ 이름:{url,cx,cy,t} }, none:{ 이름:t } }  t = 직접 고른/지운 시각 (자동으로 찾은 사진은 0)
+function normPhotos(d) {
+  const photos = {}, none = {};
+  for (const [n, p] of Object.entries((d && d.photos) || {})) if (p && p.url) photos[n] = { url: p.url, cx: p.cx, cy: p.cy, t: typeof p.t === 'number' ? p.t : 1 };
+  const nn = (d && d.none) || {};
+  if (Array.isArray(nn)) nn.forEach((n) => { none[n] = 1; }); else for (const [n, t] of Object.entries(nn)) none[n] = typeof t === 'number' ? t : 1;
+  return { photos, none };
+}
+// src에서 target보다 새로운 것만 골라냄 (force면 전부)
+function diffPhotos(target, src, force) {
+  const out = [];
+  const cur = (n) => Math.max(target.photos[n] ? target.photos[n].t : -1, n in target.none ? target.none[n] : -1);
+  for (const [n, p] of Object.entries(src.photos)) {
+    const c = cur(n), tp = target.photos[n];
+    if (tp && tp.url === p.url && !(n in target.none)) continue;
+    if (force || c < 0 || p.t > c) out.push({ kind: 'photo', name: n, p });
+  }
+  for (const [n, t] of Object.entries(src.none)) {
+    if (n in target.none && !target.photos[n]) continue;
+    if (force || t > cur(n)) out.push({ kind: 'none', name: n, t });
+  }
+  return out;
+}
+function applyDiff(state, diff) {
+  for (const d of diff) {
+    if (d.kind === 'photo') { state.photos[d.name] = d.p; delete state.none[d.name]; }
+    else { state.none[d.name] = d.t; delete state.photos[d.name]; }
+  }
+  return state;
+}
 function exportPhotos() {
-  const photos = {}, none = [], manual = {};
+  const photos = {}, none = {}, manual = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k.startsWith('gb:auto:')) { const r = store.get(k.slice(3)); if (r && r.url) photos[k.slice(8).split('|')[0]] = { url: r.url, cx: r.cx, cy: r.cy }; }
-    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) manual[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy }; }
-    if (k.startsWith('gb:none:')) none.push(k.slice(8));
+    if (k.startsWith('gb:auto:')) { const r = store.get(k.slice(3)); if (r && r.url) photos[k.slice(8).split('|')[0]] = { url: r.url, cx: r.cx, cy: r.cy, t: 0 }; }
+    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) manual[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy, t: r.t || 1 }; }
+    if (k.startsWith('gb:none:')) { const v = store.get(k.slice(3)); none[k.slice(8)] = v === true ? 1 : v; }
   }
   Object.assign(photos, manual);
-  for (const n of none) delete photos[n];
-  return { app: 'jcs-photos', version: 2, savedAt: new Date().toISOString(), photos, none };
+  for (const n of Object.keys(none)) delete photos[n];
+  return { app: 'jcs-photos', version: 3, savedAt: new Date().toISOString(), photos, none };
 }
-function importPhotos(data) {
+function importPhotos(data, force = true) {
   if (!data || data.app !== 'jcs-photos') throw new Error('정치쇼 사진 백업 파일이 아니에요.');
-  for (const [name, p] of Object.entries(data.photos || {})) { store.set('manual:' + name, p); store.del('none:' + name); }
-  for (const name of data.none || []) if (!(data.photos || {})[name]) store.set('none:' + name, true);
-  return Object.keys(data.photos || {}).length;
+  const diff = diffPhotos(normPhotos(exportPhotos()), normPhotos(data), force);
+  for (const d of diff) {
+    if (d.kind === 'photo') { store.set('manual:' + d.name, d.p); store.del('none:' + d.name); }
+    else { store.set('none:' + d.name, d.t); store.del('manual:' + d.name); }
+  }
+  return diff.length;
 }
 
 const syncGet = async (k) => store.get(k);
@@ -364,39 +399,81 @@ function utf8b64(str) {
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
 }
-let pushTimer = null;
+async function fetchRemote(tok) {
+  const res = await fetch(SYNC_URL, { cache: 'no-store', headers: { Accept: 'application/vnd.github.raw+json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) } })
+    .catch(() => { throw new Error('GitHub에 접속하지 못했어요. 인터넷 연결을 확인해 주세요.'); });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('연동 사진을 읽지 못했어요 (' + res.status + ')');
+  return res.json();
+}
+// 받아오기: 다른 기기에서 더 나중에 고르거나 지운 것만 반영 (이름별로 합침)
 async function syncPull(silent) {
   try {
-    const tok = await getGhToken();
-    const res = await fetch(SYNC_URL, { cache: 'no-store', headers: { Accept: 'application/vnd.github.raw+json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) } });
-    if (!res.ok) return false;
-    const data = await res.json();
-    const seen = (await syncGet('syncSeen')) || '', edit = (await syncGet('localEdit')) || '';
-    if (!data.savedAt || data.savedAt <= seen || data.savedAt <= edit) return false;   // 이미 받았거나 내 쪽이 더 최신
-    const n = await importPhotos(data);
-    await syncSet('syncSeen', data.savedAt);
-    if (!silent) status(`연동된 사진 ${n}명분을 받아왔어요.`);
-    return true;
-  } catch (e) { return false; }
+    const remote = await fetchRemote(await getGhToken());
+    if (!remote) { if (!silent) status('아직 연동된 사진이 없어요. PC에서 [폰 연동]을 먼저 눌러 주세요.'); return 0; }
+    const n = await importPhotos(remote, false);
+    if (!silent) status(n ? `연동된 사진 ${n}건을 받아왔어요.` : '이미 최신이에요. 새로 받을 사진이 없어요.');
+    return n;
+  } catch (e) { if (!silent) status(e.message, true); return 0; }
 }
+// 올리기: GitHub에 있는 것과 내 것을 이름별로 합쳐서 저장 (다른 기기 사진을 지우지 않음)
 async function syncPush() {
   const tok = await getGhToken();
-  if (!tok) return false;
-  const data = await exportPhotos();
+  if (!tok) return 0;
   const h = { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json' };
-  let sha;
-  const cur = await fetch(SYNC_URL, { cache: 'no-store', headers: h });
-  if (cur.ok) sha = (await cur.json()).sha;
-  const res = await fetch(SYNC_URL, { method: 'PUT', headers: h,
-    body: JSON.stringify({ message: '사진 연동 ' + data.savedAt, content: utf8b64(JSON.stringify(data)), ...(sha ? { sha } : {}) }) });
-  if (!res.ok) throw new Error(res.status === 401 || res.status === 403 || res.status === 404 ? 'GitHub 키가 맞지 않아요. 키를 다시 입력해 주세요.' : '연동 업로드 실패 (' + res.status + ')');
-  await syncSet('syncSeen', data.savedAt);
-  return Object.keys(data.photos).length;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const cur = await fetch(SYNC_URL, { cache: 'no-store', headers: h }).catch(() => { throw new Error('GitHub에 접속하지 못했어요. 인터넷 연결을 확인해 주세요.'); });
+    if (cur.status === 401 || cur.status === 403) throw new Error('GitHub 키가 맞지 않아요. 키를 다시 입력해 주세요.');
+    let sha, remote = { photos: {}, none: {} };
+    if (cur.ok) { const j = await cur.json(); sha = j.sha; try { remote = normPhotos(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\s/g, '')), (c) => c.charCodeAt(0))))); } catch (e) { const r = await fetchRemote(tok); if (r) remote = normPhotos(r); } }
+    const mine = normPhotos(await exportPhotos());
+    const diff = diffPhotos(remote, mine, false);
+    if (sha && !diff.length) return Object.keys(remote.photos).length;   // 바뀐 것 없음
+    const merged = applyDiff(remote, diff);
+    const body = { app: 'jcs-photos', version: 3, savedAt: new Date().toISOString(), photos: merged.photos, none: merged.none };
+    const res = await fetch(SYNC_URL, { method: 'PUT', headers: h,
+      body: JSON.stringify({ message: '사진 연동 ' + body.savedAt, content: utf8b64(JSON.stringify(body)), ...(sha ? { sha } : {}) }) });
+    if (res.ok) return Object.keys(merged.photos).length;
+    if (res.status === 409 || res.status === 422) continue;   // 그 사이 다른 기기가 올림 → 다시 합쳐서 시도
+    throw new Error(res.status === 401 || res.status === 403 || res.status === 404 ? 'GitHub 키가 맞지 않아요. 키를 다시 입력해 주세요.' : '연동 업로드 실패 (' + res.status + ')');
+  }
+  throw new Error('연동 업로드가 겹쳤어요. 잠시 뒤 다시 해 주세요.');
 }
-function schedulePush(edited) {
-  if (edited) syncSet('localEdit', new Date().toISOString());
+// ───────── 실시간 자동 연동: 다른 기기에서 사진이 바뀌면 열어둔 화면에 알아서 반영 ─────────
+let liveEtag = null, liveBusy = false;
+async function liveTick() {
+  if (liveBusy || document.hidden || document.querySelector('.overlay')) return;   // 사진 고르는 중엔 건드리지 않음
+  liveBusy = true;
+  try {
+    const tok = await getGhToken();
+    const res = await fetch(SYNC_URL, { cache: 'no-store', headers: { Accept: 'application/vnd.github.raw+json',
+      ...(tok ? { Authorization: 'Bearer ' + tok } : {}), ...(liveEtag ? { 'If-None-Match': liveEtag } : {}) } });
+    if (res.status === 304 || !res.ok) return;   // 바뀐 것 없음
+    liveEtag = res.headers.get('ETag');
+    const n = await importPhotos(await res.json(), false);
+    if (n && current) {
+      const y = window.scrollY;
+      render(current);
+      window.scrollTo(0, y);
+      status(`다른 기기에서 바뀐 사진 ${n}건을 자동으로 반영했어요.`);
+    }
+  } catch (e) { /* 인터넷이 잠깐 끊겨도 다음에 다시 확인 */ }
+  finally { liveBusy = false; }
+}
+async function startLiveSync() {
+  const every = (await getGhToken()) ? 30000 : 90000;   // 키가 있으면 30초, 없으면 1분 30초마다 확인
+  setInterval(liveTick, every);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) liveTick(); });   // 앱·창으로 돌아오면 바로 확인
+  window.addEventListener('focus', liveTick);
+}
+
+let pushTimer = null;
+function schedulePush() {
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => syncPush().then((n) => { if (n) status(`사진 ${n}명분을 폰과 연동했어요.`); }).catch((e) => status(e.message, true)), 3000);
+  pushTimer = setTimeout(async () => {
+    if (!(await getGhToken())) return;
+    syncPush().then((n) => { if (n) status(`사진을 다른 기기와 연동했어요.`); }).catch((e) => status(e.message, true));
+  }, 3000);
 }
 function openSettings() {
   const ov = el('div', 'overlay'), box = el('div', 'picker');
@@ -405,11 +482,19 @@ function openSettings() {
   row('카카오 키 입력', kakaoKey() ? '입력됨 · 바꾸려면 누르세요' : '사진 검색에 필요해요', askKey);
   row('PC 사진 지금 받아오기', 'PC에서 고른 사진을 바로 가져와요 (앱을 열 때도 자동)', async () => {
     status('PC 사진 확인 중…');
-    const got = await syncPull(false); if (got && current) render(current); if (!got) status('새로 받을 사진이 없어요. (이미 최신)');
+    const got = await syncPull(true);
+    if (got && current) render(current);
+    alert(got ? `PC에서 고른 사진 ${got}건을 받아왔어요.` : '이미 최신이에요. 새로 받을 사진이 없어요.\n(PC에서 [폰 연동]을 먼저 눌렀는지 확인해 주세요)');
   });
   row('폰에서 고른 사진도 PC로 보내기', store.get('ghToken') ? '켜짐 · GitHub 키 입력됨' : 'GitHub 키를 입력하면 폰에서 고른 사진도 PC에 연동돼요', () => {
     const t = prompt('GitHub 키를 붙여넣으세요. (비우면 끄기)', store.get('ghToken') || ''); if (t === null) return;
-    if (t.trim()) { store.set('ghToken', t.trim()); schedulePush(false); } else store.del('ghToken');
+    const tok = t.replace(/\s+/g, '');
+    if (!tok) { store.del('ghToken'); alert('폰 → PC 보내기를 껐어요.'); return; }
+    if (!/^(github_pat_|ghp_)/.test(tok)) { alert('키 모양이 달라요. github_pat_ 으로 시작하는 키를 전부 붙여넣어 주세요.'); return; }
+    store.set('ghToken', tok);
+    status('GitHub 연결 확인 중…');
+    syncPush().then((n) => { status(''); alert(`연결됐어요! 지금 폰에 있는 사진 ${n}명분을 PC로 보냈어요.\n앞으로 폰에서 고른 사진은 자동으로 PC에 연동돼요.`); })
+      .catch((e) => { status(e.message, true); alert('연결 실패: ' + e.message); if (/키가 맞지/.test(e.message)) store.del('ghToken'); });
   });
   row('사진 백업', '지금 보이는 사진을 파일로 저장 (다운로드 폴더)', () => {
     const data = exportPhotos(), n = Object.keys(data.photos).length;
@@ -422,7 +507,7 @@ function openSettings() {
   row('사진 복원', '백업 파일에서 사진 되살리기 (PC 백업 파일도 가능)', () => {
     const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json';
     f.onchange = async () => {
-      try { const n = importPhotos(JSON.parse(await f.files[0].text())); if (current) render(current); status(`사진 ${n}명분을 되살렸어요.`); }
+      try { const n = importPhotos(JSON.parse(await f.files[0].text()), true); schedulePush(); if (current) render(current); status(`사진 ${n}건을 되살렸어요.`); }
       catch (e) { status(e.message, true); }
     };
     f.click();
@@ -438,4 +523,5 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#dateSel').value === todayStr()) init(false); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
 init();
+startLiveSync();
 setTimeout(() => loadFace(), 0);
