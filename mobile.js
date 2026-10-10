@@ -381,6 +381,8 @@ function exportPhotos() {
 function importPhotos(data, force = true) {
   if (!data || data.app !== 'jcs-photos') throw new Error('정치쇼 사진 백업 파일이 아니에요.');
   const diff = diffPhotos(normPhotos(exportPhotos()), normPhotos(data), force);
+  // 백업 복원은 '지금 직접 고른 것'으로 취급 → 다른 기기 사진보다 최신이 되어 연동에서 이김
+  if (force) { const now = Date.now(); for (const d of diff) { if (d.kind === 'photo') d.p = { ...d.p, t: now }; else d.t = now; } }
   for (const d of diff) {
     if (d.kind === 'photo') { store.set('manual:' + d.name, d.p); store.del('none:' + d.name); }
     else { store.set('none:' + d.name, d.t); store.del('manual:' + d.name); }
@@ -522,6 +524,133 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 // 앱으로 돌아왔을 때: 오늘을 보고 있을 때만 다시 확인 (지난 날짜를 직접 골라 보고 있으면 그대로 둠)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#dateSel').value === todayStr()) init(false); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
+
+// ───────── 출연자 검색: 이름·소속을 치면 언제 출연했는지 ─────────
+// 지난 방송 명단을 모아 둔 색인 { 글번호: { d:날짜, t:제목, u:수정시각, g:[[이름, 소속, 코너, 부]] } }
+const INDEX_MAX = 300;   // 최근 300회(약 1년 2개월)
+let gIndex = null, indexing = null, indexProgress = '';
+async function loadIndex() { if (!gIndex) gIndex = (await store.get('gindex')) || {}; return gIndex; }
+function compactGuests(parsed) {
+  const g = [];
+  for (const pt of parsed.parts || []) for (const c of pt.corners) for (const x of c.guests) if (x.name) g.push([x.name, x.role, c.name || '', pt.label || '']);
+  return g;
+}
+function ensureIndex(onProgress) {
+  if (indexing) return indexing;
+  indexing = (async () => {
+    const idx = await loadIndex();
+    // 1) 게시판 글 목록 (16개씩 넘겨가며)
+    const list = [];
+    for (let off = 0; off < INDEX_MAX; off += 16) {
+      indexProgress = `지난 방송 목록 확인 중 ${list.length}개…`; onProgress && onProgress();
+      let j; try { j = await getJsonp(`${API}/lists?board_code=${BOARD}&offset=${off}&limit=16&action_type=callback&callback=boardListCallback_${BOARD}`); } catch (e) { break; }
+      const items = (j.list || []).filter((x) => x.DELETED !== 'Y');
+      list.push(...items);
+      if (items.length < 16) break;
+    }
+    // 2) 아직 색인에 없거나 고쳐진 글만 본문 읽기 (4개씩 동시에)
+    const todo = list.filter((x) => !idx[x.NO] || idx[x.NO].u !== (x.UPDATE_DATE || x.REG_DATE));
+    let done = 0;
+    const work = async (x) => {
+      try {
+        const j = await getJsonp(`${API}/detail/${x.NO}?action_type=callback&board_code=${BOARD}&callback=boardViewCallback_${BOARD}`);
+        const d = j.Response_Data_For_Detail;
+        if (d) {
+          const title = htmlToText(d.TITLE || x.TITLE);
+          idx[x.NO] = { d: dateFromTitle(title) || (x.REG_DATE || '').slice(0, 10), t: title, u: x.UPDATE_DATE || x.REG_DATE, g: compactGuests(parseBody(htmlToText(d.CONTENT || ''), title)) };
+        }
+      } catch (e) {}
+      done++;
+      indexProgress = `지난 방송 명단 모으는 중 ${done}/${todo.length}…`;
+      if (done % 10 === 0) { await store.set('gindex', idx); onProgress && onProgress(); }
+    };
+    for (let i = 0; i < todo.length; i += 4) await Promise.all(todo.slice(i, i + 4).map(work));
+    await store.set('gindex', idx);
+    indexProgress = '';
+    onProgress && onProgress();
+    return idx;
+  })().finally(() => { indexing = null; });
+  return indexing;
+}
+function searchIndex(idx, q) {
+  q = q.replace(/\s+/g, '');
+  const people = new Map();
+  for (const [no, p] of Object.entries(idx)) {
+    for (const [name, role, corner, part] of p.g) {
+      if (!name.includes(q) && !role.replace(/\s+/g, '').includes(q)) continue;
+      if (!people.has(name)) people.set(name, { name, roles: new Map(), hits: [] });
+      const it = people.get(name);
+      it.roles.set(role, (it.roles.get(role) || '') > p.d ? it.roles.get(role) : p.d);
+      if (!it.hits.some((h) => h.no === no)) it.hits.push({ no, date: p.d, title: p.t, u: p.u, role, corner, part });
+    }
+  }
+  const out = [...people.values()];
+  for (const it of out) {
+    it.hits.sort((a, b) => b.date.localeCompare(a.date));
+    it.role = [...it.roles.entries()].sort((a, b) => b[1].localeCompare(a[1]))[0][0];   // 가장 최근 소속
+  }
+  // 이름이 정확히 같은 사람 → 이름이 들어간 사람 → 소속만 맞는 사람, 그 안에서 최근 출연 순
+  const rank = (it) => (it.name === q ? 0 : it.name.includes(q) ? 1 : 2);
+  return out.sort((a, b) => rank(a) - rank(b) || b.hits[0].date.localeCompare(a.hits[0].date));
+}
+const fullDate = (s) => { const [y, m, d] = s.split('-'); return `${y}.${m}.${d} (${'일월화수목금토'[new Date(s + 'T00:00:00').getDay()]})`; };
+async function goToPost(h) {
+  if (!posts.some((p) => p.date === h.date)) {
+    posts.push({ no: Number(h.no), title: h.title, href: viewUrl(h.no), updated: h.u, date: h.date });
+    posts.sort((a, b) => b.date.localeCompare(a.date));
+  }
+  fillSelect(h.date);
+  await show(h.date);
+  window.scrollTo(0, 0);
+}
+async function openSearch() {
+  const ov = el('div', 'overlay'), box = el('div', 'picker search');
+  const close = el('button', 'pclose', '닫기'); close.onclick = () => ov.remove();
+  const inp = document.createElement('input'); inp.type = 'search'; inp.className = 'sinput'; inp.placeholder = '이름 또는 소속 (예: 김도형, 한국일보)';
+  const prog = el('div', 'sprog'), res = el('div', 'sres');
+  box.append(el('div', 'ptitle', '출연자 검색'), inp, prog, res, close); ov.append(box);
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  document.body.append(ov);
+  setTimeout(() => inp.focus(), 50);
+  let last = '';
+  const draw = async (forceDraw) => {
+    const q = inp.value.trim();
+    prog.textContent = indexProgress;
+    if (!forceDraw && q === last) return;
+    last = q; res.textContent = '';
+    const idx = await loadIndex();
+    const n = Object.keys(idx).length;
+    if (!q) { res.append(el('div', 'pmsg', n ? `지난 방송 ${n}회분에서 찾아요. 이름이나 소속을 입력하세요.` : '지난 방송 명단을 모으는 중이에요…')); return; }
+    const found = searchIndex(idx, q);
+    if (!found.length) { res.append(el('div', 'pmsg', `"${q}" 출연 기록이 없어요.` + (indexProgress ? ' (아직 모으는 중이라 조금 뒤 다시 나올 수 있어요)' : ''))); return; }
+    for (const it of found.slice(0, 30)) {
+      const card = el('div', 'scard');
+      const ph = el('div', 'sphoto', it.name.slice(-2));
+      knownPhoto(it.name, it.role).then((u) => { if (u) { ph.textContent = ''; const im = document.createElement('img'); im.referrerPolicy = 'no-referrer'; im.src = u; im.onerror = () => { ph.textContent = it.name.slice(-2); }; ph.append(im); } });
+      const info = el('div', 'sinfo');
+      info.append(el('div', 'sname', it.name), el('div', 'srole', it.role), el('div', 'scount', `출연 ${it.hits.length}회 · 최근 ${fullDate(it.hits[0].date)}`));
+      const list = el('div', 'shits');
+      it.hits.slice(0, 50).forEach((h) => {
+        const a = el('button', 'shit');
+        a.append(el('b', null, fullDate(h.date)), document.createTextNode(` ${h.part}${h.corner ? ' [' + h.corner + ']' : ''}` + (h.role !== it.role ? ` · ${h.role}` : '')));
+        a.onclick = () => { ov.remove(); goToPost(h); };
+        list.append(a);
+      });
+      const head = el('div', 'shead'); head.append(ph, info);
+      card.append(head, list); res.append(card);
+    }
+  };
+  inp.oninput = () => draw();
+  draw(true);
+  ensureIndex(() => { if (document.body.contains(ov)) draw(true); });
+}
+
+async function knownPhoto(name, role) {
+  const m = store.get('manual:' + name); if (m && m.url) return m.url;
+  const a = store.get('auto:' + name + '|' + role); return (a && a.url) || '';
+}
+$('#search').onclick = openSearch;
+setTimeout(() => ensureIndex(), 10000);
 init();
 startLiveSync();
 setTimeout(() => loadFace(), 0);
