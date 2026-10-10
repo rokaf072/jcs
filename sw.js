@@ -1,5 +1,5 @@
 // 앱 파일(화면·얼굴 인식 데이터)만 휴대폰에 저장해서 빠르게 열기. 출연자 정보는 항상 새로 받음.
-const CACHE = 'jcs-guest-v21';
+const CACHE = 'jcs-guest-v22';
 const FILES = ['./', 'index.html', 'canvas-fix.js', 'mobile.js', 'parser.js', 'manifest.webmanifest', 'lib/face-api.js',
   'icons/icon192.png', 'icons/icon512.png',
   'lib/model/tiny_face_detector_model-weights_manifest.json', 'lib/model/tiny_face_detector_model.bin',
