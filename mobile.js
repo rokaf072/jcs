@@ -345,17 +345,18 @@ function normPhotos(d) {
   return { photos, none };
 }
 // src에서 target보다 새로운 것만 골라냄 (force면 전부)
-function diffPhotos(target, src, force) {
+// srcWinsTie: 같은 시각(옛 기록끼리 등)이면 src 쪽을 따름 → 받아올 때는 GitHub(공용) 사진으로 맞춰짐
+function diffPhotos(target, src, force, srcWinsTie = false) {
   const out = [];
   const cur = (n) => Math.max(target.photos[n] ? target.photos[n].t : -1, n in target.none ? target.none[n] : -1);
   for (const [n, p] of Object.entries(src.photos)) {
     const c = cur(n), tp = target.photos[n];
     if (tp && tp.url === p.url && !(n in target.none)) continue;
-    if (force || c < 0 || p.t > c) out.push({ kind: 'photo', name: n, p });
+    if (force || c < 0 || p.t > c || (srcWinsTie && p.t === c)) out.push({ kind: 'photo', name: n, p });
   }
   for (const [n, t] of Object.entries(src.none)) {
     if (n in target.none && !target.photos[n]) continue;
-    if (force || t > cur(n)) out.push({ kind: 'none', name: n, t });
+    if (force || t > cur(n) || (srcWinsTie && t === cur(n))) out.push({ kind: 'none', name: n, t });
   }
   return out;
 }
@@ -380,7 +381,7 @@ function exportPhotos() {
 }
 function importPhotos(data, force = true) {
   if (!data || data.app !== 'jcs-photos') throw new Error('정치쇼 사진 백업 파일이 아니에요.');
-  const diff = diffPhotos(normPhotos(exportPhotos()), normPhotos(data), force);
+  const diff = diffPhotos(normPhotos(exportPhotos()), normPhotos(data), force, !force);
   // 백업 복원은 '지금 직접 고른 것'으로 취급 → 다른 기기 사진보다 최신이 되어 연동에서 이김
   if (force) { const now = Date.now(); for (const d of diff) { if (d.kind === 'photo') d.p = { ...d.p, t: now }; else d.t = now; } }
   for (const d of diff) {
