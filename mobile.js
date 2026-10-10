@@ -6,7 +6,8 @@ const LIST_URL = 'https://programs.sbs.co.kr/radio/lchshow/board/65364';
 const API = 'https://api.board.sbs.co.kr/bbs/V2.0/basic/board';
 const BOARD = 'lchshow_02';
 const viewUrl = (no) => `${LIST_URL}/?cmd=view&board_no=${no}`;
-const $ = (s) => document.querySelector(s);
+// 화면에 없는 버튼이 있어도(예: 예전 index.html) 멈추지 않도록 빈 요소로 대신함
+const $ = (s) => document.querySelector(s) || document.createElement('div');
 const store = {
   get(k) { try { const v = localStorage.getItem('gb:' + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem('gb:' + k, JSON.stringify(v)); } catch (e) {} },

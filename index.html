@@ -78,6 +78,13 @@
 
   .search .sinput { width:100%; font:inherit; font-size:17px; padding:10px 12px; border:2px solid var(--brand); border-radius:10px; margin:10px 0 4px; }
   .sprog { font-size:12px; color:var(--sub); min-height:16px; margin-bottom:6px; }
+
+  /* 검색창: 화면 위쪽에 고정, 높이 고정 → 글자 칠 때 창이 움직이지 않음. 결과만 안에서 스크롤 */
+  .overlay.sov { align-items:flex-start; }
+  .picker.search { display:flex; flex-direction:column; height:88vh; max-height:88vh; overflow:hidden; border-radius:0 0 16px 16px; margin-top:0; }
+  .stop { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .sclose { font:inherit; font-size:14px; padding:6px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); }
+  .sres { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
   .scard { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
   .shead { display:flex; gap:10px; align-items:center; }
   .sphoto { width:60px; height:75px; border-radius:6px; background:#e6eeec; flex:none; display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--brand-d); overflow:hidden; font-size:18px; }
@@ -100,6 +107,7 @@
   </div>
   <div class="row2">
     <select id="dateSel"></select>
+    <button id="today">오늘</button>
     <button id="refresh">새로고침</button>
     <button id="openPost">원문</button>
   </div>
