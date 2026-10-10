@@ -319,19 +319,49 @@ async function show(date, force = false) {
     render(post);
   } catch (e) { status(e.message, true); }
 }
+
+// ───────── 보고 있던 화면 기억 (새로고침·F5·당겨서 새로고침 후에도 같은 날짜·같은 위치) ─────────
+function saveView() {
+  try {
+    const date = $('#dateSel').value; if (!date) return;
+    const p = posts.find((x) => x.date === date);
+    sessionStorage.setItem('jcsView', JSON.stringify({ date, y: window.scrollY, post: p || null }));
+  } catch (e) {}
+}
+function loadView() { try { return JSON.parse(sessionStorage.getItem('jcsView') || 'null'); } catch (e) { return null; } }
+let viewTimer = null;
+window.addEventListener('scroll', () => { clearTimeout(viewTimer); viewTimer = setTimeout(saveView, 200); }, { passive: true });
+function restoreScroll(y) {
+  if (!y) return;
+  window.scrollTo(0, y);
+  setTimeout(() => window.scrollTo(0, y), 400);    // 사진이 들어오며 높이가 바뀌어도 한 번 더 맞춤
+  setTimeout(() => window.scrollTo(0, y), 1200);
+}
 async function init(force = false) {
   try {
+    // 새로고침: 보고 있던 날짜를 그대로 유지 (처음 열 때만 오늘)
+    // [새로고침] 버튼이면 지금 화면, 브라우저 새로고침(F5·당겨서)이면 직전에 보던 화면을 유지
+    const saved = loadView();
+    const keep = force ? $('#dateSel').value : (saved && saved.date) || '';
+    const keepY = force ? window.scrollY : (saved && saved.y) || 0;
+    const keepPost = keep && (posts.find((p) => p.date === keep) || (saved && saved.date === keep && saved.post));
     posts = store.get('posts') || [];
     await Promise.all([
       fetchList().catch((e) => { if (!posts.length) throw e; status('인터넷 연결을 확인하세요. 저장된 내용을 보여드려요.', true); }),
       Promise.race([syncPull(true), new Promise((r) => setTimeout(r, 4000))]),   // PC에서 고른 사진 받아오기
     ]);
     fillSelect();
-    await show(todayStr(), false);   // 처음 열 때·새로고침 → 오늘
+    if (keepPost && !posts.some((p) => p.date === keep)) { posts.push(keepPost); posts.sort((a, b) => b.date.localeCompare(a.date)); }
+    const target = keep || todayStr();
+    fillSelect(target);
+    await show(target, force);   // [새로고침]이면 그 날짜 내용도 새로 받아옴
+    restoreScroll(keepY);
+    saveView();
   } catch (e) { status(e.message, true); }
 }
-$('#dateSel').onchange = (e) => show(e.target.value);
+$('#dateSel').onchange = async (e) => { await show(e.target.value); window.scrollTo(0, 0); saveView(); };
 $('#refresh').onclick = () => init(true);
+$('#today').onclick = async () => { fillSelect(todayStr()); await show(todayStr()); window.scrollTo(0, 0); saveView(); };
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
 // ───────── 설정: 카카오 키 / 사진 백업 / 사진 복원 ─────────
 
@@ -603,13 +633,15 @@ async function goToPost(h) {
   fillSelect(h.date);
   await show(h.date);
   window.scrollTo(0, 0);
+  saveView();
 }
 async function openSearch() {
-  const ov = el('div', 'overlay'), box = el('div', 'picker search');
-  const close = el('button', 'pclose', '닫기'); close.onclick = () => ov.remove();
+  const ov = el('div', 'overlay sov'), box = el('div', 'picker search');
+  const close = el('button', 'sclose', '닫기'); close.onclick = () => ov.remove();
   const inp = document.createElement('input'); inp.type = 'search'; inp.className = 'sinput'; inp.placeholder = '이름 또는 소속 (예: 김도형, 한국일보)';
   const prog = el('div', 'sprog'), res = el('div', 'sres');
-  box.append(el('div', 'ptitle', '출연자 검색'), inp, prog, res, close); ov.append(box);
+  const top = el('div', 'stop'); top.append(el('div', 'ptitle', '출연자 검색'), close);
+  box.append(top, inp, prog, res); ov.append(box);
   ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
   document.body.append(ov);
   setTimeout(() => inp.focus(), 50);
@@ -641,7 +673,8 @@ async function openSearch() {
       card.append(head, list); res.append(card);
     }
   };
-  inp.oninput = () => draw();
+  let typing = null;
+  inp.oninput = () => { clearTimeout(typing); typing = setTimeout(() => { draw(); res.scrollTop = 0; }, 350); };
   draw(true);
   ensureIndex(() => { if (document.body.contains(ov)) draw(true); });
 }
