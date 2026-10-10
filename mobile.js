@@ -378,7 +378,7 @@ $('#openPost').onclick = () => window.open(current && current.url ? current.url 
 // 형식: { photos:{ 이름:{url,cx,cy,t} }, none:{ 이름:t } }  t = 직접 고른/지운 시각 (자동으로 찾은 사진은 0)
 function normPhotos(d) {
   const photos = {}, none = {};
-  for (const [n, p] of Object.entries((d && d.photos) || {})) if (p && p.url) photos[n] = { url: p.url, cx: p.cx, cy: p.cy, crop: p.crop, t: typeof p.t === 'number' ? p.t : 1, ...(p.auto ? { auto: 1 } : {}) };
+  for (const [n, p] of Object.entries((d && d.photos) || {})) if (p && p.url) photos[n] = { url: p.url, cx: p.cx, cy: p.cy, crop: p.crop, t: typeof p.t === 'number' ? p.t : 1, ...(p.auto ? { auto: 1 } : {}), ...(p.lock ? { lock: 1 } : {}) };
   const nn = (d && d.none) || {};
   if (Array.isArray(nn)) nn.forEach((n) => { none[n] = 1; }); else for (const [n, t] of Object.entries(nn)) none[n] = typeof t === 'number' ? t : 1;
   return { photos, none };
