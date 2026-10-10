@@ -161,7 +161,14 @@ function setPhoto(box, info, name) {
   info = info || {};
   box.textContent = '';
   box.classList.toggle('unsure', !info.url);
-  if (info.url) {
+  if (info.url && info.crop) {
+    const c = info.crop, d = document.createElement('div');   // PC가 영상 장면에서 얼굴만 잘라 둔 사진
+    d.className = 'cropimg';
+    d.style.backgroundImage = `url("${info.url}")`;
+    d.style.backgroundSize = `${100 / c.w}% ${100 / c.h}%`;
+    d.style.backgroundPosition = `${c.w < 1 ? (c.x / (1 - c.w)) * 100 : 0}% ${c.h < 1 ? (c.y / (1 - c.h)) * 100 : 0}%`;
+    box.append(d);
+  } else if (info.url) {
     const img = document.createElement('img');
     img.referrerPolicy = 'no-referrer'; img.alt = name; img.src = info.url;
     if (info.cy != null) img.style.objectPosition = `${Math.round((info.cx ?? 0.5) * 100)}% ${Math.round(Math.min(info.cy, 0.6) * 100)}%`;
@@ -170,6 +177,7 @@ function setPhoto(box, info, name) {
   } else {
     box.append(el('div', null, name.slice(-2)), el('div', 'need', kakaoKey() ? '탭해서 사진 확인' : '⚙에서 키 입력'));
   }
+  if (info.url && info.temp) box.append(el('span', 'tempbadge', '임시'));
 }
 function openPicker(g, ph) {
   if (!kakaoKey()) { askKey(); return; }
@@ -303,10 +311,10 @@ function renderWaiting(date, note) {
   const m = waitingMessage(date), main = $('#main'); main.textContent = '';
   const box = el('div', 'waiting');
   const t = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-  box.append(el('div', 'whead', m.head), el('div', 'wtext', note || m.text), el('div', 'wtime', m.auto ? `마지막 확인 ${t} · 3분마다 자동 확인 중` : `마지막 확인 ${t}`));
+  box.append(el('div', 'whead', m.head), el('div', 'wtext', note || m.text), el('div', 'wtime', m.auto ? `마지막 확인 ${t} · ${(() => { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); return hm >= 360 && hm < 425 ? '30초' : '3분'; })()}마다 자동 확인 중` : `마지막 확인 ${t}`));
   main.append(box); status('');
   clearTimeout(waitTimer);
-  if (m.auto && date === todayStr()) waitTimer = setTimeout(() => init(true), 3 * 60000);
+  if (m.auto && date === todayStr()) { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); waitTimer = setTimeout(() => init(true), hm >= 360 && hm < 425 ? 30000 : 3 * 60000); }
 }
 async function show(date, force = false) {
   clearTimeout(waitTimer);
@@ -370,7 +378,7 @@ $('#openPost').onclick = () => window.open(current && current.url ? current.url 
 // 형식: { photos:{ 이름:{url,cx,cy,t} }, none:{ 이름:t } }  t = 직접 고른/지운 시각 (자동으로 찾은 사진은 0)
 function normPhotos(d) {
   const photos = {}, none = {};
-  for (const [n, p] of Object.entries((d && d.photos) || {})) if (p && p.url) photos[n] = { url: p.url, cx: p.cx, cy: p.cy, t: typeof p.t === 'number' ? p.t : 1 };
+  for (const [n, p] of Object.entries((d && d.photos) || {})) if (p && p.url) photos[n] = { url: p.url, cx: p.cx, cy: p.cy, crop: p.crop, t: typeof p.t === 'number' ? p.t : 1 };
   const nn = (d && d.none) || {};
   if (Array.isArray(nn)) nn.forEach((n) => { none[n] = 1; }); else for (const [n, t] of Object.entries(nn)) none[n] = typeof t === 'number' ? t : 1;
   return { photos, none };
@@ -403,7 +411,7 @@ function exportPhotos() {
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k.startsWith('gb:auto:')) { const r = store.get(k.slice(3)); if (r && r.url) photos[k.slice(8).split('|')[0]] = { url: r.url, cx: r.cx, cy: r.cy, t: 0 }; }
-    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) manual[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy, t: r.t || 1 }; }
+    if (k.startsWith('gb:manual:')) { const r = store.get(k.slice(3)); if (r && r.url) manual[k.slice(10)] = { url: r.url, cx: r.cx, cy: r.cy, crop: r.crop, t: r.t || 1 }; }
     if (k.startsWith('gb:none:')) { const v = store.get(k.slice(3)); none[k.slice(8)] = v === true ? 1 : v; }
   }
   Object.assign(photos, manual);
