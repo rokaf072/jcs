@@ -381,7 +381,9 @@ function normPhotos(d) {
   for (const [n, p] of Object.entries((d && d.photos) || {})) if (p && p.url) photos[n] = { url: p.url, cx: p.cx, cy: p.cy, crop: p.crop, t: typeof p.t === 'number' ? p.t : 1, ...(p.auto ? { auto: 1 } : {}), ...(p.lock ? { lock: 1 } : {}) };
   const nn = (d && d.none) || {};
   if (Array.isArray(nn)) nn.forEach((n) => { none[n] = 1; }); else for (const [n, t] of Object.entries(nn)) none[n] = typeof t === 'number' ? t : 1;
-  return { photos, none };
+  const chk = {};   // PC들이 쓰는 확인 기록 — 폰은 그대로 보존만
+  for (const [n, t] of Object.entries((d && d.chk) || {})) if (typeof t === 'number') chk[n] = t;
+  return { photos, none, chk };
 }
 // src에서 target보다 새로운 것만 골라냄 (force면 전부)
 // srcWinsTie: 같은 시각(옛 기록끼리 등)이면 src 쪽을 따름 → 받아올 때는 GitHub(공용) 사진으로 맞춰짐
@@ -472,7 +474,7 @@ async function syncPush() {
     const diff = diffPhotos(remote, mine, false);
     if (sha && !diff.length) return Object.keys(remote.photos).length;   // 바뀐 것 없음
     const merged = applyDiff(remote, diff);
-    const body = { app: 'jcs-photos', version: 3, savedAt: new Date().toISOString(), photos: merged.photos, none: merged.none };
+    const body = { app: 'jcs-photos', version: 3, savedAt: new Date().toISOString(), photos: merged.photos, none: merged.none, chk: merged.chk || {} };
     const res = await fetch(SYNC_URL, { method: 'PUT', headers: h,
       body: JSON.stringify({ message: '사진 연동 ' + body.savedAt, content: utf8b64(JSON.stringify(body)), ...(sha ? { sha } : {}) }) });
     if (res.ok) return Object.keys(merged.photos).length;
