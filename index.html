@@ -99,6 +99,28 @@
   .photo, .sphoto { position:relative; }
   .tempbadge { position:absolute; left:4px; top:4px; background:#f0b429; color:#3a2a00; font-size:11px; font-weight:800; padding:1px 6px; border-radius:4px; }
   .pclose { width:100%; margin-top:12px; border:1px solid var(--line); }
+  /* 신문 요약 */
+  .news { max-width:1100px; margin:6px auto 40px; padding:14px 12px; border-top:4px double var(--brand); scroll-margin-top:110px; }
+  .nhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .nhead h2 { margin:0; font-size:20px; }
+  .nsub { color:var(--sub); font-size:12.5px; flex:1; }
+  .nrefresh { font:inherit; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); }
+  .nsbs { background:#fff4f4; border:2px solid #d9534f; border-radius:12px; padding:10px 12px; margin:12px 0 14px; }
+  .nsbs h4 { margin:10px 0 2px; font-size:13.5px; color:#b3261e; }
+  .nsbs h3 { margin:0 0 6px; color:#b3261e; font-size:17px; }
+  .ngrid { display:grid; grid-template-columns:1fr; gap:10px; }
+  @media (min-width:600px) { .ngrid { grid-template-columns:1fr 1fr; } }
+  .ncol { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+  .ncol h3 { margin:0 0 4px; font-size:17px; border-bottom:2px solid var(--brand); padding-bottom:4px; }
+  .ncol h4 { margin:10px 0 4px; font-size:13.5px; color:var(--brand-d); }
+  .news ul { list-style:none; margin:0; padding:0; }
+  .nitem { padding:8px 0; border-bottom:1px dashed var(--line); }
+  .nitem:last-child { border-bottom:none; }
+  .ntitle { color:var(--ink); text-decoration:none; font-weight:700; font-size:15px; line-height:1.45; }
+  .npaper { display:inline-block; background:#b3261e; color:#fff; font-size:11px; padding:1px 6px; border-radius:4px; margin-right:6px; vertical-align:2px; }
+  .ndesc { color:var(--sub); font-size:13px; line-height:1.45; margin-top:2px; }
+  .ntime { color:#9aa8a5; font-size:11px; margin-top:2px; }
+  .nempty { color:var(--sub); font-size:13px; margin:4px 0; }
 </style>
 </head>
 <body>
@@ -106,6 +128,7 @@
   <div class="row1">
     <h1>김태현의 정치쇼 출연자</h1>
     <button class="icon-btn" id="search" title="출연자 검색">🔍</button>
+    <button class="icon-btn" id="newsBtn" title="신문 요약">📰</button>
     <button class="icon-btn" id="settings" title="설정">⚙</button>
   </div>
   <div class="row2">
@@ -117,9 +140,11 @@
 </header>
 <div id="status"></div>
 <main id="main"></main>
+<section id="news" class="news"></section>
 <script src="canvas-fix.js"></script>
 <script src="lib/face-api.js"></script>
 <script src="parser.js"></script>
 <script src="mobile.js"></script>
+<script src="news.js"></script>
 </body>
 </html>
