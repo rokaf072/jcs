@@ -84,20 +84,44 @@
     li.append(el('div', 'ntime', hm(i.t)));
     return li;
   }
+  let lastData = null;
+  const viewMode = () => { try { return localStorage.getItem('jcsNewsView') === 'sbs' ? 'sbs' : 'all'; } catch (e) { return 'all'; } };
   function draw(data, loading) {
     const box = document.getElementById('news');
     if (!box) return;
     box.textContent = '';
     const head = el('div', 'nhead');
     head.append(el('h2', null, '📰 신문 요약'), el('span', 'nsub', loading ? '새 기사 받는 중…' : (data ? `불러온 시각 ${hm(data.at)}` : '')));
+    // 보기 선택: 전체 / SBS만 (마지막 선택 기억)
+    const seg = el('div', 'nseg');
+    for (const [v, label] of [['all', '전체'], ['sbs', 'SBS만']]) {
+      const b = el('button', 'nsegb' + (v === 'sbs' ? ' sbs' : '') + (viewMode() === v ? ' on' : ''), label);
+      b.onclick = () => { try { localStorage.setItem('jcsNewsView', v); } catch (e) {} draw(lastData, false); };
+      seg.append(b);
+    }
+    head.append(seg);
     const btn = el('button', 'nrefresh', '새로 받기'); btn.onclick = () => refresh(true); head.append(btn);
     box.append(head);
+    lastData = data;
     if (!data || !data.items.length) { box.append(el('p', 'nempty', loading ? '기사를 불러오는 중이에요…' : '기사를 불러오지 못했어요. 인터넷 연결을 확인하고 [새로 받기]를 눌러주세요.')); return; }
     const items = uniq(data.items);
     // 1) SBS 관련 — 무조건 맨 위
     // 순서: 신문사별(정치 → 방송·언론, SBS 기사는 빨간 표시) → 맨 아래 SBS 예능·드라마·연예
     const isSbs = (i) => i.sbsQ || RE_SBS.test(i.title + ' ' + i.desc);
     const isNewsy = (i) => !isEnt(i) && (RE_BROAD.test(i.title + ' ' + i.desc) || RE_POL.test(i.title + ' ' + i.desc) || /SBS.{0,12}(노조|사장|임원|이사회|보도|광고|매출|실적|채용|공채|재허가|재승인|소송|징계|파업)/.test(i.title));
+    if (viewMode() === 'sbs') {   // SBS 기사만: 뉴스·방송 / 예능·드라마·연예, 최신순
+      const sbs = items.filter(isSbs).sort((a, b) => (b.t || 0) - (a.t || 0));
+      const wrap = el('div', 'nsbsonly');
+      for (const [label, list, cls] of [['SBS 뉴스·방송', sbs.filter(isNewsy), ''], ['SBS 예능·드라마·연예', sbs.filter((i) => !isNewsy(i)), ' ent']]) {
+        const sec = el('section', 'nsbscol' + cls);
+        sec.append(el('h3', null, `${label} (${list.length})`));
+        if (list.length) { const ul = el('ul'); list.slice(0, 60).forEach((i) => ul.append(item(i, true))); sec.append(ul); }
+        else sec.append(el('p', 'nempty', '기사 없음'));
+        wrap.append(sec);
+      }
+      box.append(wrap);
+      return;
+    }
     const grid = el('div', 'ngrid');
     for (const p of PAPERS) {
       const ok = items.filter((i) => i.paper === p.name && isNewsy(i));
