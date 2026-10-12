@@ -75,6 +75,7 @@
   const hm = (t) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
   function item(i, showPaper) {
     const li = el('li', 'nitem');
+    i.__li = li; shown.push(i);
     const a = el('a', 'ntitle', cleanTitle(i.title)); a.href = i.url || i.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
     a.onclick = (e) => { e.preventDefault(); openArticle(i); };   // 누르면 앱 안에서 요약 보기 (광고 없이)
     if (i.sum && i.sum.length) li.classList.add('hassum');
@@ -86,7 +87,9 @@
   }
   let lastData = null;
   const viewMode = () => { try { return localStorage.getItem('jcsNewsView') === 'sbs' ? 'sbs' : 'all'; } catch (e) { return 'all'; } };
+  let shown = [];   // 지금 화면에 보이는 기사
   function draw(data, loading) {
+    shown = [];
     const box = document.getElementById('news');
     if (!box) return;
     box.textContent = '';
@@ -121,6 +124,7 @@
         wrap.append(sec);
       }
       box.append(wrap);
+      prefetchSoon();
       return;
     }
     const grid = el('div', 'ngrid');
@@ -138,6 +142,7 @@
       grid.append(col);
     }
     box.append(grid);
+    prefetchSoon();
     const ent = items.filter((i) => isSbs(i) && !isNewsy(i));
     const sec = el('section', 'nsbs');
     sec.append(el('h3', null, `SBS 예능·드라마·연예 (${ent.length})`));
@@ -260,11 +265,37 @@
       return { url, img, sum };
     };
   })();
+
+  // PC: 화면에 보이는 기사 중 요약이 없는 건 뒤에서 미리 요약해 둠 (클릭하면 바로 보이게)
+  let pfTimer = null, pfRun = false;
+  try { const ks = Object.keys(localStorage).filter((k) => k.startsWith('jcsSum:')); if (ks.length > 600) ks.forEach((k) => localStorage.removeItem(k)); } catch (e) {}   // 쌓이면 비움
+  function prefetchSoon() { if (!IS_EXT) return; clearTimeout(pfTimer); pfTimer = setTimeout(prefetch, 1500); }
+  async function prefetch() {
+    if (pfRun) return; pfRun = true;
+    try {
+      const todo = shown.filter((i) => !(i.sum && i.sum.length) && !i.__tried);
+      let k = 0;
+      await Promise.all(Array.from({ length: 3 }, async () => {
+        while (k < todo.length) {
+          const i = todo[k++]; i.__tried = true;
+          const r = await LiveSum(i).catch(() => null);
+          if (!r) continue;
+          Object.assign(i, r);
+          try { localStorage.setItem('jcsSum:' + keyOf(i.title), JSON.stringify(r)); } catch (e) {}
+          if (i.__li) i.__li.classList.add('hassum');
+        }
+      }));
+    } finally { pfRun = false; }
+  }
   // ── 기사 요약 보기 창 ──
   function openArticle(i) {
     const ov = el('div', 'nov'); const box = el('div', 'nbox');
-    const close = el('button', 'nclose', '닫기'); close.onclick = () => ov.remove();
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    // 요약 창이 떠 있는 동안 뒤의 목록은 움직이지 않게 (손가락으로 밀어도 창 안만 스크롤)
+    document.documentElement.classList.add('nlock');
+    const unlock = () => { if (!document.querySelector('.nov')) document.documentElement.classList.remove('nlock'); };
+    const closeOv = () => { ov.remove(); unlock(); };
+    const close = el('button', 'nclose', '닫기'); close.onclick = closeOv;
+    ov.onclick = (e) => { if (e.target === ov) closeOv(); };
     const top = el('div', 'ntop'); top.append(el('span', 'npaper', i.paper), el('span', 'ntime', hm(i.t)), close);
     box.append(top, el('h3', 'nh', cleanTitle(i.title)));
     if (i.img) { const im = document.createElement('img'); im.className = 'nimg'; im.referrerPolicy = 'no-referrer'; im.src = i.img; im.onerror = () => im.remove(); box.append(im); }
