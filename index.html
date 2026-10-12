@@ -120,7 +120,25 @@
   .npaper { display:inline-block; background:#b3261e; color:#fff; font-size:11px; padding:1px 6px; border-radius:4px; margin-right:6px; vertical-align:2px; }
   .ndesc { color:var(--sub); font-size:13px; line-height:1.45; margin-top:2px; }
   .ntime { color:#9aa8a5; font-size:11px; margin-top:2px; }
+  .nsbsitem { border-left:4px solid #d9534f; padding-left:8px; background:#fff7f7; }
+  .gterm { border-bottom:2px dotted var(--brand); color:var(--brand-d); cursor:pointer; }
+  .gbub { position:fixed; z-index:80; background:#1b2a27; color:#fff; border-radius:10px; padding:10px 12px; box-shadow:0 6px 20px rgba(0,0,0,.3); font-size:14px; line-height:1.55; }
+  .gbub b { display:block; color:#9fe3d4; margin-bottom:3px; font-size:15px; }
+  .gbub .gmore { display:inline-block; margin-top:6px; color:#9fe3d4; font-size:12.5px; }
+  .nhint { font-size:12px; color:var(--sub); margin:-4px 0 6px; }
   .nempty { color:var(--sub); font-size:13px; margin:4px 0; }
+  .nitem.hassum .ntitle::after { content:' 요약'; font-size:10.5px; font-weight:700; color:#fff; background:var(--brand); border-radius:4px; padding:0 4px; margin-left:4px; vertical-align:2px; }
+  .nov { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:60; display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:4vh 10px; }
+  .nbox { background:#fff; border-radius:14px; width:min(720px,100%); padding:16px 18px 20px; }
+  .ntop { display:flex; align-items:center; gap:8px; }
+  .ntop .ntime { flex:1; margin:0; }
+  .nclose { font:inherit; font-size:14px; padding:6px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); }
+  .nh { font-size:21px; line-height:1.4; margin:10px 0 12px; }
+  .nimg { width:100%; max-height:420px; object-fit:cover; border-radius:10px; margin-bottom:12px; background:#eee; }
+  .nlabel { font-weight:800; color:var(--brand-d); font-size:14px; margin-bottom:4px; }
+  .nsum p { font-size:16.5px; line-height:1.75; margin:0 0 12px; word-break:keep-all; }
+  .nsumtxt { font-size:16px; line-height:1.6; }
+  .nsrc { display:inline-block; margin-top:14px; font-size:13px; color:var(--sub); }
 </style>
 </head>
 <body>
@@ -145,6 +163,7 @@
 <script src="lib/face-api.js"></script>
 <script src="parser.js"></script>
 <script src="mobile.js"></script>
+<script src="glossary.js"></script>
 <script src="news.js"></script>
 </body>
 </html>

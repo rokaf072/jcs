@@ -54,13 +54,18 @@
     try { const r = await fetch((IS_EXT ? PAGES_NEWS : 'news.json') + '?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) return await r.json(); } catch (e) {}
     return null;
   }
+  // GitHub가 받아둔 것(요약·사진 포함)을 먼저 쓰고, PC는 그게 오래됐을 때만 신문사에서 직접 받음
   async function loadAll() {
-    if (!IS_EXT) return (await loadShared()) || { at: 0, items: [] };
+    const shared = await loadShared();
+    if (!IS_EXT) return shared || { at: 0, items: [] };
+    if (shared && Date.now() - shared.at < 45 * 60000) return shared;
     const lists = await Promise.all(PAPERS.map((p) => loadPaper(p).catch(() => [])));
     const items = lists.flat();
-    if (items.length) return { at: Date.now(), items };
-    return (await loadShared()) || { at: 0, items: [] };   // 직접 못 받으면 GitHub 것으로
+    if (!items.length) return shared || { at: 0, items: [] };
+    if (shared) { const m = new Map(shared.items.filter((i) => i.sum).map((i) => [keyOf(i.title), i])); for (const i of items) { const x = m.get(keyOf(i.title)); if (x) Object.assign(i, { sum: x.sum, img: x.img, url: x.url }); } }
+    return { at: Date.now(), items };
   }
+  const keyOf = (t) => t.replace(/\s+-\s+(조선비즈|조선일보|스포츠조선|중앙일보|중앙SUNDAY|한국경제|한경닷컴|한경|미디어오늘)\s*$/, '').replace(/\s|[^\w가-힣]/g, '').slice(0, 30);
   const cacheGet = async () => { try { return IS_EXT ? (await chrome.storage.local.get('newsCache')).newsCache : JSON.parse(localStorage.getItem('jcs:newsCache') || 'null'); } catch (e) { return null; } };
   const cacheSet = async (d) => { try { if (IS_EXT) await chrome.storage.local.set({ newsCache: d }); else localStorage.setItem('jcs:newsCache', JSON.stringify(d)); } catch (e) {} };
 
@@ -70,7 +75,9 @@
   const hm = (t) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
   function item(i, showPaper) {
     const li = el('li', 'nitem');
-    const a = el('a', 'ntitle', cleanTitle(i.title)); a.href = i.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    const a = el('a', 'ntitle', cleanTitle(i.title)); a.href = i.url || i.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.onclick = (e) => { e.preventDefault(); openArticle(i); };   // 누르면 앱 안에서 요약 보기 (광고 없이)
+    if (i.sum && i.sum.length) li.classList.add('hassum');
     if (showPaper) li.append(el('span', 'npaper', i.paper));
     li.append(a);
     if (i.desc) li.append(el('div', 'ndesc', i.desc));
@@ -88,36 +95,51 @@
     if (!data || !data.items.length) { box.append(el('p', 'nempty', loading ? '기사를 불러오는 중이에요…' : '기사를 불러오지 못했어요. 인터넷 연결을 확인하고 [새로 받기]를 눌러주세요.')); return; }
     const items = uniq(data.items);
     // 1) SBS 관련 — 무조건 맨 위
-    // SBS는 예능·드라마·연예 소식까지 모두 (회사·보도 / 예능·드라마로 나눠 보여줌)
-    const sbs = items.filter((i) => i.sbsQ || RE_SBS.test(i.title + ' ' + i.desc));
+    // 순서: 신문사별(정치 → 방송·언론, SBS 기사는 빨간 표시) → 맨 아래 SBS 예능·드라마·연예
+    const isSbs = (i) => i.sbsQ || RE_SBS.test(i.title + ' ' + i.desc);
     const isNewsy = (i) => !isEnt(i) && (RE_BROAD.test(i.title + ' ' + i.desc) || RE_POL.test(i.title + ' ' + i.desc) || /SBS.{0,12}(노조|사장|임원|이사회|보도|광고|매출|실적|채용|공채|재허가|재승인|소송|징계|파업)/.test(i.title));
-    const sbsNews = sbs.filter(isNewsy), sbsEnt = sbs.filter((i) => !isNewsy(i));
-    const sec = el('section', 'nsbs');
-    sec.append(el('h3', null, `SBS 관련 (${sbs.length})`));
-    for (const [label, list, max] of [['회사·보도·시사', sbsNews, 20], ['예능·드라마·연예', sbsEnt, 30]]) {
-      sec.append(el('h4', null, `${label} (${list.length})`));
-      if (list.length) { const ul = el('ul'); list.slice(0, max).forEach((i) => ul.append(item(i, true))); sec.append(ul); }
-      else sec.append(el('p', 'nempty', '기사 없음'));
-    }
-    box.append(sec);
-    // 2) 신문사별: 정치 / 방송·언론
     const grid = el('div', 'ngrid');
     for (const p of PAPERS) {
-      const mine = items.filter((i) => i.paper === p.name);
+      const ok = items.filter((i) => i.paper === p.name && isNewsy(i));
+      const pol = ok.filter((i) => RE_POL.test(i.title + ' ' + i.desc) && !RE_BROAD.test(i.title + ' ' + i.desc));
+      const broad = ok.filter((i) => !pol.includes(i));
       const col = el('section', 'ncol');
       col.append(el('h3', null, p.name));
-      const ok = mine.filter((i) => !isEnt(i));
-      const broad = ok.filter((i) => RE_BROAD.test(i.title + ' ' + i.desc));
-      const pol = ok.filter((i) => !broad.includes(i) && RE_POL.test(i.title + ' ' + i.desc));
-      const groups = p.name === '미디어오늘' ? [['방송·언론', ok.filter((i) => !pol.includes(i))], ['정치', pol]] : [['정치', pol], ['방송·언론', broad]];
-      for (const [label, list] of groups) {
+      for (const [label, list] of [['정치', pol], ['방송·언론', broad.sort((a, b) => isSbs(b) - isSbs(a))]]) {
         col.append(el('h4', null, `${label} (${list.length})`));
-        if (list.length) { const ul = el('ul'); list.slice(0, 8).forEach((i) => ul.append(item(i, false))); col.append(ul); }
+        if (list.length) { const ul = el('ul'); list.slice(0, 8).forEach((i) => { const li = item(i, false); if (isSbs(i)) li.classList.add('nsbsitem'); ul.append(li); }); col.append(ul); }
         else col.append(el('p', 'nempty', '기사 없음'));
       }
       grid.append(col);
     }
     box.append(grid);
+    const ent = items.filter((i) => isSbs(i) && !isNewsy(i));
+    const sec = el('section', 'nsbs');
+    sec.append(el('h3', null, `SBS 예능·드라마·연예 (${ent.length})`));
+    if (ent.length) { const ul = el('ul'); ent.slice(0, 40).forEach((i) => ul.append(item(i, true))); sec.append(ul); }
+    else sec.append(el('p', 'nempty', '기사 없음'));
+    box.append(sec);
+  }
+  // ── 기사 요약 보기 창 ──
+  function openArticle(i) {
+    const ov = el('div', 'nov'); const box = el('div', 'nbox');
+    const close = el('button', 'nclose', '닫기'); close.onclick = () => ov.remove();
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    const top = el('div', 'ntop'); top.append(el('span', 'npaper', i.paper), el('span', 'ntime', hm(i.t)), close);
+    box.append(top, el('h3', 'nh', cleanTitle(i.title)));
+    if (i.img) { const im = document.createElement('img'); im.className = 'nimg'; im.referrerPolicy = 'no-referrer'; im.src = i.img; im.onerror = () => im.remove(); box.append(im); }
+    if (i.sum && i.sum.length) {
+      // 2~3문장씩 묶어 문단으로 (읽기 편하게)
+      const wrap = el('div', 'nsum');
+      for (let k = 0; k < i.sum.length; k += 2) wrap.append(el('p', null, i.sum.slice(k, k + 2).join(' ')));
+      if (window.jcsMarkTerms) window.jcsMarkTerms(wrap);   // 어려운 용어에 밑줄 → 누르면 설명
+      box.append(el('div', 'nlabel', '요약'), wrap, el('div', 'nhint', '밑줄 친 용어를 누르면 설명이 나와요. 다른 단어는 길게 눌러(PC는 마우스로 끌어) 고르면 찾아봐요.'));
+    } else {
+      if (i.desc) { const d = el('div', 'nsum'); d.append(el('p', null, i.desc)); if (window.jcsMarkTerms) window.jcsMarkTerms(d); box.append(d); }
+      box.append(el('p', 'nempty', '이 기사는 아직 요약을 만들지 못했어요. 15분 안에 다시 시도해요.'));
+    }
+    const src = el('a', 'nsrc', '원문 기사 보기 (신문사 사이트, 광고 있음)'); src.href = i.url || i.link; src.target = '_blank'; src.rel = 'noopener noreferrer';
+    box.append(src); ov.append(box); document.body.append(ov);
   }
   let busy = false;
   async function refresh(force) {
