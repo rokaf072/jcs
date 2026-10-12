@@ -288,14 +288,34 @@
     } finally { pfRun = false; }
   }
   // ── 기사 요약 보기 창 ──
+  let reopening = false;
   function openArticle(i) {
     const ov = el('div', 'nov'); const box = el('div', 'nbox');
     // 요약 창이 떠 있는 동안 뒤의 목록은 움직이지 않게 (손가락으로 밀어도 창 안만 스크롤)
     document.documentElement.classList.add('nlock');
     const unlock = () => { if (!document.querySelector('.nov')) document.documentElement.classList.remove('nlock'); };
-    const closeOv = () => { ov.remove(); unlock(); };
-    const close = el('button', 'nclose', '닫기'); close.onclick = closeOv;
+    let closed = false;
+    const closeOv = (fromBack) => {
+      if (closed) return; closed = true;
+      ov.remove(); unlock();
+      if (!fromBack && history.state && history.state.jcsArt) history.back();   // 뒤로가기 기록 정리
+    };
+    const close = el('button', 'nclose', '닫기'); close.onclick = () => closeOv();
     ov.onclick = (e) => { if (e.target === ov) closeOv(); };
+    // 1) 엄지 닿는 오른쪽 아래에 늘 떠 있는 ✕ 버튼
+    const fab = el('button', 'nfab', '✕'); fab.title = '닫기'; fab.onclick = (e) => { e.stopPropagation(); closeOv(); };
+    ov.append(fab);
+    // 2) 폰 뒤로가기(◀) 버튼으로 닫기
+    if (!reopening) { try { history.pushState({ jcsArt: 1 }, ''); } catch (e) {} }
+    const onPop = () => { window.removeEventListener('popstate', onPop); closeOv(true); };
+    window.addEventListener('popstate', onPop);
+    // 3) 옆으로 쓱 밀면(좌·우 스와이프) 닫기
+    let sx = 0, sy = 0, st = 0;
+    ov.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
+    ov.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0]; const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) > 90 && Math.abs(dy) < 60 && Date.now() - st < 600 && !(window.getSelection() + '')) closeOv();
+    }, { passive: true });
     const top = el('div', 'ntop'); top.append(el('span', 'npaper', i.paper), el('span', 'ntime', hm(i.t)), close);
     box.append(top, el('h3', 'nh', cleanTitle(i.title)));
     if (i.img) { const im = document.createElement('img'); im.className = 'nimg'; im.referrerPolicy = 'no-referrer'; im.src = i.img; im.onerror = () => im.remove(); box.append(im); }
@@ -316,7 +336,7 @@
           if (!r) { wait.textContent = '이 기사는 본문을 읽지 못했어요. 아래 원문 기사 보기로 확인해 주세요.'; return; }
           Object.assign(i, r);
           try { localStorage.setItem('jcsSum:' + keyOf(i.title), JSON.stringify(r)); } catch (e) {}
-          if (document.body.contains(ov)) { ov.remove(); openArticle(i); }
+          if (document.body.contains(ov)) { closed = true; ov.remove(); reopening = true; openArticle(i); reopening = false; }
         }).catch(() => { i.__trying = false; wait.textContent = '요약을 만들지 못했어요. 아래 원문 기사 보기로 확인해 주세요.'; });
       }
     }

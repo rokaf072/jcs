@@ -175,6 +175,9 @@
   .nsrc { display:inline-block; margin-top:14px; font-size:13px; color:var(--sub); }
   html.nlock, html.nlock body { overflow:hidden; overscroll-behavior:none; }
   .nov { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+  .nfab { position:fixed; right:18px; bottom:calc(22px + env(safe-area-inset-bottom)); z-index:61; width:58px; height:58px; border-radius:50%; border:none; font-size:24px; font-weight:800; color:#fff; background:linear-gradient(135deg,#14b8a6,#4fd1b5); box-shadow:0 8px 24px rgba(0,0,0,.45); cursor:pointer; }
+  html[data-theme="dark"] .nfab { color:#0b1f1b; }
+  .nfab:active { transform:scale(.92); }
 </style>
 </head>
 <body>
