@@ -74,7 +74,28 @@ async function gnResolve(link) {
 
 // ── 기사 본문·사진 뽑기 ──
 const meta = (h, p) => { const m = h.match(new RegExp(`<meta[^>]+(?:property|name)=["']${p}["'][^>]*content=["']([^"']+)["']`, 'i')) || h.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${p}["']`, 'i')); return m ? ent(m[1]) : ''; };
-const JUNK = /무단 ?전재|재배포 ?금지|저작권자|Copyright|ⓒ|©|구독|기자\s*[\w.-]+@|@[\w-]+\.(co|com|kr)|▶|☞|关注|좋아요|공유하기|글자크기|프린트|이 기사를|많이 본 뉴스|관련기사|광고/;
+const JUNK = /무단 ?전재|재배포 ?금지|저작권자|Copyright|ⓒ|©|구독|기자\s*[\w.-]+@|@[\w-]+\.(co|com|kr)|▶|☞|좋아요|공유하기|글자 ?크기|글씨 ?크기|프린트|이 기사를|많이 본 뉴스|관련기사|관련 기사|광고|입력\s?20\d\d|업데이트\s?20\d\d|수정\s?20\d\d|검색 먼저 보기|기사 저장|뉴스레터|기사제보|제보하기|AI 요약|음성으로 듣기/;
+// 시작 태그 위치부터 짝이 맞는 닫는 태그까지 잘라냄 (안쪽 div가 여러 겹이어도 정확히)
+function sliceEl(html, i) {
+  const name = (html.slice(i + 1).match(/^(\w+)/) || [])[1];
+  if (!name) return '';
+  const re = new RegExp(`<(/?)${name}\\b[^>]*>`, 'gi'); re.lastIndex = i;
+  let depth = 0, m;
+  while ((m = re.exec(html))) {
+    if (m[1]) { depth--; if (depth <= 0) return html.slice(i, m.index); }
+    else if (!m[0].endsWith('/>')) depth++;
+  }
+  return html.slice(i, i + 60000);
+}
+function textOf(box) {
+  const cleaned = box
+    .replace(/<(script|style|figure|figcaption|table|aside|button|noscript|iframe|svg|ul|ol)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<div[^>]+(?:class|id)=["'][^"']*(?:ad|banner|related|recommend|photo|caption|byline|reporter|copyright|tag|share|sns|link|box_|promotion)[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, ' ')
+    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/h\d>/gi, '\n');
+  return strip(cleaned.replace(/\n/g, ' ¶ ')).split(/\s*¶\s*/).map((x) => x.trim()).filter((x) => x.length > 20);
+}
+// 신문사별 본문 칸 (앞에 있을수록 우선)
+const BODY_IDS = [/id=["']article-view-content-div["']/i, /id=["']articletxt["']/i, /id=["']article_body["']/i, /class=["'][^"']*\barticle-body\b[^"']*["']/i, /class=["'][^"']*\barticle_body\b[^"']*["']/i, /itemprop=["']articleBody["']/i, /class=["'][^"']*\b(news_body|article-text|story-news|article_txt)\b[^"']*["']/i];
 function paragraphs(html) {
   // 1) 기사 구조 데이터(JSON-LD)의 articleBody
   for (const m of html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
@@ -84,15 +105,21 @@ function paragraphs(html) {
       if (b) return b.split(/\n+|(?<=다\.)\s+/).map((x) => strip(x)).filter((x) => x.length > 20);
     } catch (e) {}
   }
-  // 2) 조선일보(Arc): 본문이 페이지 속 데이터에 들어 있음
-  const arc = [...html.matchAll(/"type":"text"[^{}]{0,200}?"content":"((?:[^"\\]|\\.)*)"/g)].map((m) => { try { return strip(JSON.parse('"' + m[1] + '"')); } catch (e) { return ''; } }).filter((x) => x.length > 20);
+  // 2) 조선일보·조선비즈(Arc): 본문이 페이지 속 데이터에 "type":"text" 조각으로 들어 있음 (순서 무관하게 찾기)
+  const arc = [];
+  for (const m of html.matchAll(/"content":"((?:[^"\\]|\\.){20,})"/g)) {
+    const win = html.slice(Math.max(0, m.index - 400), m.index + m[0].length + 400);
+    if (!/"type":"text"/.test(win)) continue;
+    try { const t = strip(JSON.parse('"' + m[1] + '"')); if (t.length > 20 && !arc.includes(t)) arc.push(t); } catch (e) {}
+  }
   if (arc.length >= 2) return arc;
-  // 3) 신문사별 본문 칸
-  const box = html.match(/<(div|article|section)[^>]+(?:id|class)=["'][^"']*(article-view-content-div|articletxt|article-body|article_body|articleBody|news_body|article-text|story-news)[^"']*["'][^>]*>([\s\S]*?)<\/\1>\s*(?:<div[^>]+(?:class|id)=["'][^"']*(?:byline|copyright|reporter|article-footer|tag)|<\/(?:article|section)>)/i);
-  const src = box ? box[3] : html;
-  const ps = [...src.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => strip(m[1])).filter((x) => x.length > 25);
-  if (ps.length >= 2) return ps;
-  if (box) return strip(box[3].replace(/<br\s*\/?>/gi, '\n')).split(/\n+|(?<=다\.)\s+/).filter((x) => x.length > 25);
+  // 3) 신문사별 본문 칸만 정확히 잘라서 읽기
+  for (const re of BODY_IDS) {
+    const m = html.match(new RegExp('<(div|article|section)\\b[^>]*' + re.source + '[^>]*>', 'i'));
+    if (!m) continue;
+    const ps = textOf(sliceEl(html, m.index));
+    if (ps.join('').length > 80) return ps;
+  }
   return [];
 }
 function summarize(title, paras) {
@@ -114,6 +141,7 @@ function summarize(title, paras) {
 async function fetchSummary(item) {
   const url = /news\.google\.com/.test(item.link) ? await gnResolve(item.link) : item.link;
   if (!url) return { err: 'gn' };
+  if (/\/newsletter\/|\/opinion\/(?:column)?list|\/photo\//.test(url)) return { url, err: 'skip' };
   const html = await getText(url);
   if (!html) return { url, err: 'fetch' };
   let img = meta(html, 'og:image') || meta(html, 'twitter:image');
@@ -121,7 +149,7 @@ async function fetchSummary(item) {
   if (/logo|default|noimage|og_image\.(png|jpg)$/i.test(img)) img = '';
   const sum = summarize(item.title, paragraphs(html));
   const desc = meta(html, 'og:description') || meta(html, 'description');
-  return { url, img, sum: sum.length ? sum : (desc ? [strip(desc)] : []), err: sum.length ? '' : 'body' };
+  return { url, img, sum: sum.length ? sum : (desc ? [strip(desc)] : []), sv: 2, err: sum.length ? '' : 'body', sample: sum.length ? '' : strip(html.slice(0, 300)) };
 }
 
 // ── 실행 ──
@@ -142,16 +170,16 @@ const want = [...new Set(wanted)];
 
 // 이전에 요약해 둔 건 다시 안 받음
 let prev = {};
-try { if (existsSync('news.json')) for (const i of JSON.parse(readFileSync('news.json', 'utf8')).items || []) if (i.sum && i.sum.length) prev[keyOf(i.title)] = { url: i.url, img: i.img, sum: i.sum }; } catch (e) {}
-const todo = want.filter((i) => !prev[keyOf(i.title)]).slice(0, 70);
+try { if (existsSync('news.json')) for (const i of JSON.parse(readFileSync('news.json', 'utf8')).items || []) if (i.sum && i.sum.length && i.sv === 2) prev[keyOf(i.title)] = { url: i.url, img: i.img, sum: i.sum, sv: 2 }; } catch (e) {}   // 요약 방식이 바뀌면(sv) 다시 만듦
+const todo = want.filter((i) => !prev[keyOf(i.title)]).slice(0, 90);
 const diag = { want: want.length, reused: want.length - todo.length, tried: todo.length, ok: 0, err: {} };
 let k = 0;
 await Promise.all(Array.from({ length: 6 }, async () => {
   while (k < todo.length) {
     const it = todo[k++];
     const r = await fetchSummary(it).catch(() => ({ err: 'x' }));
-    if (r.sum && r.sum.length) { prev[keyOf(it.title)] = { url: r.url, img: r.img, sum: r.sum }; diag.ok++; }
-    if (r.err) { const e = it.paper + ':' + r.err; diag.err[e] = (diag.err[e] || 0) + 1; }
+    if (r.sum && r.sum.length) { prev[keyOf(it.title)] = { url: r.url, img: r.img, sum: r.sum, sv: 2 }; if (r.err !== 'body') diag.ok++; }
+    if (r.err) { const e = it.paper + ':' + r.err; diag.err[e] = (diag.err[e] || 0) + 1; if (r.err === 'body' && (diag.samples || (diag.samples = [])).length < 6) diag.samples.push(r.url); }
   }
 }));
 for (const i of items) { const s = prev[keyOf(i.title)]; if (s) Object.assign(i, s); }
