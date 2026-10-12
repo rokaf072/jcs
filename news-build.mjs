@@ -125,17 +125,22 @@ function paragraphs(html) {
 function summarize(title, paras) {
   const clean = paras.map((x) => x.replace(/^\[[^\]]{1,30}\]\s*/, '').replace(/^\([^)]{1,20}=[^)]{0,20}\)\s*/, '').replace(/^[가-힣]{2,4}\s?기자\s?=\s?/, '').trim())
     .filter((x) => x && !JUNK.test(x) && !/^(사진|자료|그래픽|영상)\s*[=:]/.test(x));
-  const sents = clean.join(' ').split(/(?<=다\.|요\.|\.\s|\?|!)\s+/).map((s) => s.trim()).filter((s) => s.length > 15 && s.length < 260);
+  // 사진 설명이 본문 맨 앞에 붙어 오는 경우("~하고 있다. 뉴스1 본문…") 사진 설명 문장과 출처 표시를 뗌
+  const CREDIT = '(?:뉴스1|연합뉴스|뉴시스|중앙포토|사진공동취재단|AFP|AP|EPA|로이터|AFP=연합뉴스|대통령실 제공|국회사진기자단)';
+  const joined = clean.join(' ')
+    .replace(new RegExp('^[^.]{10,220}?(?:있다|모습이다|모습|중이다)\\.\\s*' + CREDIT + '(?:\\s*연합뉴스)?\\s+'), '')
+    .replace(new RegExp('\\s' + CREDIT + '\\s+(?=[가-힣])', 'g'), ' ');
+  const sents = joined.split(/(?<=다\.|요\.|\.\s|\?|!)\s+/).map((s) => s.trim()).filter((s) => s.length > 15 && s.length < 260);
   if (!sents.length) return [];
-  // 앞부분(기사의 핵심이 모여 있는 곳) 6문장은 순서대로 그대로 + 뒷부분에서 제목과 관련 깊은 문장·인용 최대 4개
-  //  → 흐름이 끊기지 않고, 처음 보는 사람도 무슨 일인지·누가 뭐라고 했는지까지 이해되게 (최대 약 1,100자)
+  // 앞부분(기사의 핵심이 모여 있는 곳) 10문장은 순서대로 그대로 + 뒷부분에서 제목과 관련 깊은 문장·인용 최대 6개
+  //  → 흐름이 끊기지 않고, 처음 보는 사람도 무슨 일인지·누가 뭐라고 했는지까지 이해되게 (최대 약 2,000자)
   const words = new Set((title.match(/[가-힣A-Za-z0-9]{2,}/g) || []));
   const score = (s) => [...words].filter((w) => s.includes(w)).length + (/["“”‘’']/.test(s) ? 1 : 0);
-  const head = sents.slice(0, 6).map((s, i) => ({ s, i }));
-  const tail = sents.slice(6).map((s, i) => ({ s, i: i + 6, v: score(s) })).filter((x) => x.v >= 1).sort((a, b) => b.v - a.v).slice(0, 4);
+  const head = sents.slice(0, 10).map((s, i) => ({ s, i }));
+  const tail = sents.slice(10).map((s, i) => ({ s, i: i + 10, v: score(s) })).filter((x) => x.v >= 1).sort((a, b) => b.v - a.v).slice(0, 6);
   const picked = [...head, ...tail].sort((a, b) => a.i - b.i);
   const out = []; let len = 0;
-  for (const p of picked) { if (len + p.s.length > 1100) break; out.push(p.s); len += p.s.length; }
+  for (const p of picked) { if (len + p.s.length > 2000) break; out.push(p.s); len += p.s.length; }
   return out;
 }
 async function fetchSummary(item) {
@@ -149,7 +154,7 @@ async function fetchSummary(item) {
   if (/logo|default|noimage|og_image\.(png|jpg)$/i.test(img)) img = '';
   const sum = summarize(item.title, paragraphs(html));
   const desc = meta(html, 'og:description') || meta(html, 'description');
-  return { url, img, sum: sum.length ? sum : (desc ? [strip(desc)] : []), sv: 2, err: sum.length ? '' : 'body', sample: sum.length ? '' : strip(html.slice(0, 300)) };
+  return { url, img, sum: sum.length ? sum : (desc ? [strip(desc)] : []), sv: 4, err: sum.length ? '' : 'body', sample: sum.length ? '' : strip(html.slice(0, 300)) };
 }
 
 // ── 실행 ──
@@ -170,7 +175,7 @@ const want = [...new Set(wanted)];
 
 // 이전에 요약해 둔 건 다시 안 받음
 let prev = {};
-try { if (existsSync('news.json')) for (const i of JSON.parse(readFileSync('news.json', 'utf8')).items || []) if (i.sum && i.sum.length && i.sv === 2) prev[keyOf(i.title)] = { url: i.url, img: i.img, sum: i.sum, sv: 2 }; } catch (e) {}   // 요약 방식이 바뀌면(sv) 다시 만듦
+try { if (existsSync('news.json')) for (const i of JSON.parse(readFileSync('news.json', 'utf8')).items || []) if (i.sum && i.sum.length && i.sv === 4) prev[keyOf(i.title)] = { url: i.url, img: i.img, sum: i.sum, sv: 4 }; } catch (e) {}   // 요약 방식이 바뀌면(sv) 다시 만듦
 const todo = want.filter((i) => !prev[keyOf(i.title)]).slice(0, 90);
 const diag = { want: want.length, reused: want.length - todo.length, tried: todo.length, ok: 0, err: {} };
 let k = 0;
@@ -178,7 +183,7 @@ await Promise.all(Array.from({ length: 6 }, async () => {
   while (k < todo.length) {
     const it = todo[k++];
     const r = await fetchSummary(it).catch(() => ({ err: 'x' }));
-    if (r.sum && r.sum.length) { prev[keyOf(it.title)] = { url: r.url, img: r.img, sum: r.sum, sv: 2 }; if (r.err !== 'body') diag.ok++; }
+    if (r.sum && r.sum.length) { prev[keyOf(it.title)] = { url: r.url, img: r.img, sum: r.sum, sv: 4 }; if (r.err !== 'body') diag.ok++; }
     if (r.err) { const e = it.paper + ':' + r.err; diag.err[e] = (diag.err[e] || 0) + 1; if (r.err === 'body' && (diag.samples || (diag.samples = [])).length < 6) diag.samples.push(r.url); }
   }
 }));
