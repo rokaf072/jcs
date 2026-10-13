@@ -376,7 +376,7 @@
       + '모르는 건 지어내지 말고 모른다고 해. 정치 기사는 어느 편도 들지 말고 중립적으로 설명해.\n\n' + ctx;
     const body = { systemInstruction: { parts: [{ text: sys }] }, contents: history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })), generationConfig: { temperature: 0.4, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } };   // 생각 시간을 꺼서 빠르게
     // 구글이 모델 이름을 자주 바꾸고, 가끔 '붐빔(503)'이 나서: 쓸 수 있는 모델 목록을 받아 좋은 순서로 차례대로 시도
-    let limitKind = '', retrySec = 0, limitModels = [], models = await pickModels(false), sawLimit = false, sawBusy = false, refreshed = false;
+    let lastErr = '', limitKind = '', retrySec = 0, limitModels = [], models = await pickModels(false), sawLimit = false, sawBusy = false, refreshed = false;
     for (let k = 0; k < models.length && k < 5; k++) {
       const model = models[k];
       let useBody = body;
@@ -394,10 +394,11 @@
         }
         if (r.status === 400 || r.status === 403) {
           const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY');
-          if (useBody === body && /think/i.test(JSON.stringify(j))) { const g = Object.assign({}, body.generationConfig); delete g.thinkingConfig; useBody = Object.assign({}, body, { generationConfig: g }); continue; }   // 이 모델은 '생각 끄기'를 못 받음 → 빼고 다시
+          lastErr = model + ' · HTTP ' + r.status + ' · ' + String((j.error && j.error.message) || JSON.stringify(j)).replace(/\s+/g, ' ').slice(0, 140);
+          if (useBody === body && r.status === 400) { const g = Object.assign({}, body.generationConfig); delete g.thinkingConfig; useBody = Object.assign({}, body, { generationConfig: g }); continue; }   // 이 모델은 '생각 끄기'를 못 받음 → 빼고 다시
           break;
         }
-        if (r.status === 404) { if (!refreshed) { refreshed = true; models = await pickModels(true); k = -1; } break; }
+        if (r.status === 404) { lastErr = model + ' · HTTP 404'; if (!refreshed) { refreshed = true; models = await pickModels(true); k = -1; } break; }
         if (r.status === 429) {
           sawLimit = true;
           const j = await r.json().catch(() => ({})), txt = JSON.stringify(j);
@@ -410,7 +411,7 @@
       }
     }
     if (sawLimit) { const e = new Error('LIMIT'); e.kind = limitKind; e.sec = retrySec; e.models = limitModels; throw e; }
-    throw new Error(sawBusy ? 'BUSY' : 'MODEL');
+    { const e = new Error(sawBusy ? 'BUSY' : 'MODEL'); e.detail = lastErr; throw e; }
   }
   function fetchT(url, opt, ms) {
     const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
@@ -479,7 +480,7 @@
         const m = add('model', a); wait.remove(); void m;
       } catch (e) {
         hist.pop(); wait.remove();
-        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 쓸 수 있는 AI 모델을 찾지 못했어요. Google AI Studio에서 키를 새로 만들어 보세요.' : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? (e.kind === 'min' ? `1분당 사용 한도에 걸렸어요. ${e.sec ? e.sec + '초' : '1분'} 뒤에 다시 눌러 주세요.` : e.kind === 'day' ? '이 키의 오늘 무료 사용량(하루 한도)을 다 썼어요. 내일 다시 쓰거나 AI Studio에서 결제를 연결해야 해요.' : '무료 사용 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.') + ' (걸린 모델: ' + (e.models || []).join(', ') + ')' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
+        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 AI를 쓰지 못했어요.' + (e.detail ? ' [원인: ' + e.detail + ']' : ' (쓸 수 있는 모델 목록이 비어 있어요)') : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? (e.kind === 'min' ? `1분당 사용 한도에 걸렸어요. ${e.sec ? e.sec + '초' : '1분'} 뒤에 다시 눌러 주세요.` : e.kind === 'day' ? '이 키의 오늘 무료 사용량(하루 한도)을 다 썼어요. 내일 다시 쓰거나 AI Studio에서 결제를 연결해야 해요.' : '무료 사용 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.') + ' (걸린 모델: ' + (e.models || []).join(', ') + ')' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
       } finally { busy = false; }
     }
     go.onclick = () => send(inp.value);
