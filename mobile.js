@@ -305,6 +305,7 @@ function render(post) {
   raw.append(el('summary', null, '작가 원문 보기'), el('pre', null, `${post.title}\n\n${post.body}`));
   main.append(raw);
   status(`작가 등록 ${post.registered || '-'}`);
+  document.dispatchEvent(new CustomEvent('jcsrender'));
 }
 function fillSelect(selected) {
   const sel = $('#dateSel'); sel.textContent = '';
@@ -324,6 +325,7 @@ function waitingMessage(date) {
 }
 function renderWaiting(date, note) {
   current = null;
+  setTimeout(() => document.dispatchEvent(new CustomEvent('jcsrender')), 0);
   const m = waitingMessage(date), main = $('#main'); main.textContent = '';
   const box = el('div', 'waiting');
   const t = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
