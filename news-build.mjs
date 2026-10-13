@@ -7,12 +7,13 @@ const GN = (q) => 'https://news.google.com/rss/search?q=' + encodeURIComponent(q
 const PAPERS = [
   { name: '조선일보', site: 'chosun.com', feeds: ['https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml', 'https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml'] },
   { name: '중앙일보', site: 'joongang.co.kr', feeds: [] },
-  { name: '한국경제', site: 'hankyung.com', feeds: ['https://www.hankyung.com/feed/politics', 'https://www.hankyung.com/feed/all-news'] },
+  { name: '한국경제', site: 'hankyung.com', feeds: ['https://www.hankyung.com/feed/politics', 'https://www.hankyung.com/feed/all-news'], eco: ['https://www.hankyung.com/feed/economy', 'https://www.hankyung.com/feed/finance'] },
   { name: '미디어오늘', site: 'mediatoday.co.kr', feeds: ['https://www.mediatoday.co.kr/rss/allArticle.xml'] },
 ];
 const RE_SBS = /SBS|에스비에스|김태현의 정치쇼/i;
 const RE_BROAD = /방통위|방송통신|방심위|방미통위|방송사|지상파|종편|공영방송|수신료|보도국|보도본부|언론|기자협회|언론노조|방송법|재허가|재승인|이사회|사장 선임|앵커|시사 ?프로|편파|미디어|KBS|MBC|JTBC|YTN|TV조선|채널A|MBN|연합뉴스TV/;
 const RE_POL = /국회|대통령|대통령실|청와대|여당|야당|민주당|국민의힘|조국혁신당|개혁신당|정부|장관|의원|총리|선거|정치|국감|국정감사|특검|탄핵|당대표|원내/;
+const RE_ECO = /경제|금리|환율|증시|코스피|코스닥|주가|주식|물가|부동산|집값|아파트|수출|무역|관세|반도체|기업|실적|성장률|한은|한국은행|기준금리|투자|채권|원·달러|유가|가계부채|대출|세수|예산|고용|일자리/;
 const MAX_AGE = 36 * 3600000;
 const SUFFIX = /\s+-\s+(조선비즈|조선일보|스포츠조선|중앙일보|중앙SUNDAY|한국경제|한경닷컴|한경|미디어오늘)\s*$/;
 
@@ -47,10 +48,15 @@ async function loadPaper(p) {
   jobs.push(getText(GN(`site:${p.site} SBS when:3d`)).then((x) => parseRSS(x, p.name, 'gn').map((i) => ({ ...i, sbsQ: true }))));
   jobs.push(getText(GN(`site:${p.site} 방송 when:1d`)).then((x) => parseRSS(x, p.name, 'gn')));
   if (!p.feeds.length || p.name === '중앙일보') jobs.push(getText(GN(`site:${p.site} 정치 when:1d`)).then((x) => parseRSS(x, p.name, 'gn')));
+  // 경제 기사 (한국경제): 경제·금융 RSS + 구글 뉴스 보조
+  for (const u of p.eco || []) jobs.push(getText(u).then((x) => parseRSS(x, p.name, 'rss').map((i) => ({ ...i, eco: true }))));
+  if (p.eco) jobs.push(getText(GN(`site:${p.site}/economy when:1d`)).then((x) => parseRSS(x, p.name, 'gn').map((i) => ({ ...i, eco: true }))));
   const all = (await Promise.all(jobs)).flat();
-  const seen = new Set(), out = [];
+  const seen = new Map(), out = [];
   for (const i of all.sort((a, b) => (b.desc ? 1 : 0) - (a.desc ? 1 : 0))) {
-    const k = keyOf(i.title); if (seen.has(k)) continue; seen.add(k); out.push(i);
+    const k = keyOf(i.title);
+    if (seen.has(k)) { const o = seen.get(k); if (i.eco) o.eco = true; if (i.sbsQ) o.sbsQ = true; continue; }
+    seen.set(k, i); out.push(i);
   }
   return out.sort((a, b) => b.t - a.t);
 }
@@ -170,6 +176,7 @@ for (const p of PAPERS) {
   wanted.push(...mine.filter((i) => RE_BROAD.test(i.title + i.desc)).slice(0, 10));
   wanted.push(...mine.filter((i) => RE_POL.test(i.title + i.desc)).slice(0, 10));
   if (p.name === '미디어오늘') wanted.push(...mine.slice(0, 12));
+  if (p.eco) wanted.push(...mine.filter((i) => (i.eco || RE_ECO.test(i.title)) && !RE_POL.test(i.title + i.desc)).slice(0, 10));
 }
 const want = [...new Set(wanted)];
 

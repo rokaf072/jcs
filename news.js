@@ -5,7 +5,7 @@
   const PAPERS = [
     { name: '조선일보', site: 'chosun.com', feeds: ['https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml', 'https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml'] },
     { name: '중앙일보', site: 'joongang.co.kr', feeds: [] },
-    { name: '한국경제', site: 'hankyung.com', feeds: ['https://www.hankyung.com/feed/politics', 'https://www.hankyung.com/feed/all-news'] },
+    { name: '한국경제', site: 'hankyung.com', feeds: ['https://www.hankyung.com/feed/politics', 'https://www.hankyung.com/feed/all-news'], eco: ['https://www.hankyung.com/feed/economy', 'https://www.hankyung.com/feed/finance'] },
     { name: '미디어오늘', site: 'mediatoday.co.kr', feeds: ['https://www.mediatoday.co.kr/rss/allArticle.xml'] },
   ];
   const RE_SBS = /SBS|에스비에스|김태현의 정치쇼/i;
@@ -14,6 +14,7 @@
   const RE_ENT = /런닝맨|미우새|미운 ?우리|드라마|예능|시청률|아이돌|결혼|열애|임신|컴백|앨범|뮤직|♥|배우|가수|걸그룹|보이그룹|팬미팅|OST|닥터X|\[사진\]|Oh!쎈|SC이슈|美친|시구|감독|야구|축구|골프/;
   const isEnt = (i) => RE_ENT.test(i.title) || /^\[(스포츠조선|OSEN|스타뉴스|엑스포츠)/.test(i.desc || '');
   const RE_POL = /국회|대통령|대통령실|청와대|여당|야당|민주당|국민의힘|조국혁신당|개혁신당|정부|장관|의원|총리|선거|정치|국감|국정감사|특검|탄핵|당대표|원내/;
+  const RE_ECO = /경제|금리|환율|증시|코스피|코스닥|주가|주식|물가|부동산|집값|아파트|수출|무역|관세|반도체|기업|실적|성장률|한은|한국은행|기준금리|투자|채권|원·달러|유가|가계부채|대출|세수|예산|고용|일자리/;
   const MAX_AGE = 36 * 3600000;
 
   const strip = (h) => { const d = document.createElement('div'); d.innerHTML = h || ''; return (d.textContent || '').replace(/\s+/g, ' ').trim(); };
@@ -39,11 +40,13 @@
     jobs.push(getText(GN(`site:${p.site} SBS when:3d`)).then((x) => (x ? parseRSS(x, p.name, 'gn') : [])).then((l) => l.map((i) => ({ ...i, sbsQ: true }))));
     jobs.push(getText(GN(`site:${p.site} 방송 when:1d`)).then((x) => (x ? parseRSS(x, p.name, 'gn') : [])));
     if (!p.feeds.length || p.name === '중앙일보') jobs.push(getText(GN(`site:${p.site} 정치 when:1d`)).then((x) => (x ? parseRSS(x, p.name, 'gn') : [])));
+    for (const u of p.eco || []) jobs.push(getText(u).then((x) => (x ? parseRSS(x, p.name, 'rss') : [])).then((l) => l.map((i) => ({ ...i, eco: true }))));
     const all = (await Promise.all(jobs)).flat();
-    const seen = new Set(), out = [];
+    const seen = new Map(), out = [];
     for (const i of all.sort((a, b) => (b.desc ? 1 : 0) - (a.desc ? 1 : 0))) {   // 리드문 있는 쪽을 남김
       const key = i.title.replace(/\s|[^\w가-힣]/g, '').slice(0, 30);
-      if (seen.has(key)) continue; seen.add(key); out.push(i);
+      if (seen.has(key)) { const o = seen.get(key); if (i.eco) o.eco = true; if (i.sbsQ) o.sbsQ = true; continue; }
+      seen.set(key, i); out.push(i);
     }
     return out.sort((a, b) => b.t - a.t);
   }
@@ -136,7 +139,13 @@
       const broad = ok.filter((i) => !pol.includes(i));
       const col = el('section', 'ncol');
       col.append(el('h3', null, p.name));
-      for (const [label, list] of [['정치', pol], ['방송·언론', broad.sort((a, b) => isSbs(b) - isSbs(a))]]) {
+      const secs = [['정치', pol]];
+      if (p.eco) {   // 한국경제: 경제 기사 (정치·방송 기사와 겹치지 않게)
+        const eco = items.filter((i) => i.paper === p.name && (i.eco || RE_ECO.test(i.title)) && !isEnt(i) && !pol.includes(i) && !RE_BROAD.test(i.title + ' ' + i.desc));
+        secs.push(['경제', eco]);
+      }
+      secs.push(['방송·언론', broad.filter((i) => !(p.eco && (i.eco || RE_ECO.test(i.title)) && !RE_BROAD.test(i.title + ' ' + i.desc) && !isSbs(i))).sort((a, b) => isSbs(b) - isSbs(a))]);
+      for (const [label, list] of secs) {
         col.append(el('h4', null, `${label} (${list.length})`));
         if (list.length) { const ul = el('ul'); list.slice(0, 8).forEach((i) => { const li = item(i, false); if (isSbs(i)) li.classList.add('nsbsitem'); ul.append(li); }); col.append(ul); }
         else col.append(el('p', 'nempty', '기사 없음'));
