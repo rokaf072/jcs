@@ -212,10 +212,24 @@ function openPicker(g, ph) {
   };
   const fb = el('button', null, '갤러리 사진'); fb.onclick = () => file.click();
   r1.append(ga, na, fb, file);
+  // 사진을 길게 눌러 [이미지 복사] 한 뒤 이 버튼 → 바로 등록
+  const cb = el('button', null, '📋 복사한 사진 넣기');
+  cb.onclick = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const t = it.types.find((x) => x.startsWith('image/'));
+        if (t) { const blob = await it.getType(t); return pickUrl(await sharedToDataUrl(blob)); }
+        if (it.types.includes('text/plain')) { const u = (await (await it.getType('text/plain')).text()).trim(); if (/^https?:/.test(u)) return pickUrl(u); }
+      }
+      alert('복사된 사진이 없어요. 사진을 길게 눌러 [이미지 복사]를 먼저 해주세요.');
+    } catch (e) { alert('복사한 사진을 읽지 못했어요. 권한을 물어보면 [허용]을 눌러주세요.'); }
+  };
+  const r3 = el('div', 'mrow'); r3.append(cb);
   const r2 = el('div', 'mrow'); const inp = document.createElement('input'); inp.placeholder = '이미지 주소 붙여넣기';
   const okb = el('button', 'primary', '등록'); okb.onclick = () => { const u = inp.value.trim(); if (/^https?:/.test(u)) pickUrl(u); else inp.focus(); };
   r2.append(inp, okb);
-  bar.append(el('div', 'mtitle', '원하는 사진이 없으면 직접 등록'), r1, r2, el('div', 'mhelp', '구글·네이버에서 마음에 드는 사진을 길게 눌러 [이미지 공유] → [정치쇼]를 고르면 바로 등록돼요. (사진을 한 번 눌러 크게 띄운 뒤 길게 누르면 더 선명해요)'));
+  bar.append(el('div', 'mtitle', '원하는 사진이 없으면 직접 등록'), r1, r3, r2, el('div', 'mhelp', '구글에서 사진을 한 번 눌러 크게 띄운 뒤, 사진 위를 길게 눌러 [이미지 공유] → [정치쇼]를 고르면 바로 등록돼요. 또는 [이미지 복사] 후 돌아와 [📋 복사한 사진 넣기]를 누르세요.'));
   box.insertBefore(bar, grid);
   const section = (t) => { const w = el('div', 'pmsg', '찾는 중…'), end = el('div', 'pend'); grid.append(el('div', 'psec', t), w, end); return { w, end }; };
   const add = (sec, it) => {
@@ -742,7 +756,11 @@ async function handleShared() {
       if (ok) { url = c; break; }
     }
   }
-  if (!url) { status('받은 것에서 사진을 찾지 못했어요. 받은 내용: ' + (shared ? shared.slice(0, 120) : '없음'), true); return; }
+  if (!url) {
+    const page = /search\.naver\.com|google\.[a-z.]+\/search/.test(shared);
+    status(page ? '사진이 아니라 검색 화면 주소가 왔어요. 화면 메뉴(⋮)의 공유 말고, 사진 위를 길게 눌러 나오는 [이미지 공유]를 써주세요. 네이버는 길게 누르기가 막혀 있으면 구글을 써주세요.' : '받은 것에서 사진을 찾지 못했어요. 받은 내용: ' + (shared ? shared.slice(0, 120) : '없음'), true);
+    return;
+  }
   let g = store.get('pendingPick');
   if (!g || Date.now() - g.t > 3600000) g = await chooseGuest();
   if (!g) return;
