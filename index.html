@@ -178,6 +178,9 @@
   .nfab { position:fixed; right:18px; bottom:calc(22px + env(safe-area-inset-bottom)); z-index:61; width:58px; height:58px; border-radius:50%; border:none; font-size:24px; font-weight:800; color:#fff; background:linear-gradient(135deg,#14b8a6,#4fd1b5); box-shadow:0 8px 24px rgba(0,0,0,.45); cursor:pointer; }
   html[data-theme="dark"] .nfab { color:#0b1f1b; }
   .nfab:active { transform:scale(.92); }
+  .icon-btn#rotBtn { position:relative; }
+  .icon-btn#rotBtn.off { opacity:.55; }
+  .rtoast { position:fixed; left:50%; bottom:calc(30px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#232a35; color:#fff; padding:10px 16px; border-radius:999px; font-size:14px; z-index:90; box-shadow:0 6px 18px rgba(0,0,0,.4); }
 </style>
 </head>
 <body>
@@ -186,6 +189,7 @@
     <h1>김태현의 정치쇼 출연자</h1>
     <button class="icon-btn" id="search" title="출연자 검색">🔍</button>
     <button class="icon-btn" id="newsBtn" title="신문 요약">📰</button>
+    <button class="icon-btn" id="rotBtn" title="화면 회전 잠금">🔒</button>
     <button class="icon-btn" id="themeBtn" title="밝은/어두운 화면">☀</button>
     <button class="icon-btn" id="settings" title="설정">⚙</button>
   </div>
