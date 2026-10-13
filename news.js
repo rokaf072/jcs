@@ -392,6 +392,7 @@
           if (out && cand.finishReason === 'MAX_TOKENS') out += ' …(길어서 여기서 끊겼어요. "계속 설명해줘"라고 보내 보세요)';
           return out || '대답을 만들지 못했어요. 다시 물어봐 주세요.';
         }
+        if (!r.ok && r.status !== 429 && r.status !== 404 && r.status < 500 && r.status !== 400 && r.status !== 403) lastErr = model + ' · HTTP ' + r.status;
         if (r.status === 400 || r.status === 403) {
           const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY');
           lastErr = model + ' · HTTP ' + r.status + ' · ' + String((j.error && j.error.message) || JSON.stringify(j)).replace(/\s+/g, ' ').slice(0, 140);
@@ -423,12 +424,15 @@
     const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(aiKey())}`, {}, 15000);
     if (r.status === 400 || r.status === 403) throw new Error('KEY');
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const list = ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map((m) => m.name.replace(/^models\//, '')).filter((n) => /^gemini/.test(n) && !/image|tts|audio|live|embed|vision|robotics|computer/.test(n));
+    const all = (await r.json()).models || [];
+    const gen = all.filter((m) => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent')).map((m) => m.name.replace(/^models\//, ''));
+    const bad = /image|tts|audio|live|embed|vision|robotics|computer|imagen|veo|aqa/;
+    let list = gen.filter((n) => /^gemini/.test(n) && !bad.test(n));
+    if (!list.length) list = gen.filter((n) => !bad.test(n));   // gemini 이름이 아니어도(예: gemma) 쓸 수 있는 건 사용
     const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0');
     const score = (n) => (/flash/.test(n) ? 100 : 0) - (/lite/.test(n) ? 30 : 0) - (/preview|exp/.test(n) ? 10 : 0) - (/pro/.test(n) ? 60 : 0) + (/latest/.test(n) ? 5 : 0) + ver(n);
+    if (!list.length) { const e = new Error('MODEL'); e.detail = `구글이 알려 준 모델 ${all.length}개 중 대화용 ${gen.length}개` + (all.length ? ' (예: ' + all.slice(0, 4).map((m) => m.name.replace(/^models\//, '')).join(', ') + ')' : ''); throw e; }
     list.sort((a, b) => score(b) - score(a));
-    if (!list.length) throw new Error('MODEL');
     try { localStorage.setItem(AI_MODEL, JSON.stringify(list)); } catch (e) {}
     return list;
   }
@@ -480,7 +484,7 @@
         const m = add('model', a); wait.remove(); void m;
       } catch (e) {
         hist.pop(); wait.remove();
-        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 AI를 쓰지 못했어요.' + (e.detail ? ' [원인: ' + e.detail + ']' : ' (쓸 수 있는 모델 목록이 비어 있어요)') : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? (e.kind === 'min' ? `1분당 사용 한도에 걸렸어요. ${e.sec ? e.sec + '초' : '1분'} 뒤에 다시 눌러 주세요.` : e.kind === 'day' ? '이 키의 오늘 무료 사용량(하루 한도)을 다 썼어요. 내일 다시 쓰거나 AI Studio에서 결제를 연결해야 해요.' : '무료 사용 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.') + ' (걸린 모델: ' + (e.models || []).join(', ') + ')' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
+        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 AI를 쓰지 못했어요.' + (e.detail ? ' [원인: ' + e.detail + ']' : ' (원인을 알 수 없어요. 키를 다시 넣어 보세요)') : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? (e.kind === 'min' ? `1분당 사용 한도에 걸렸어요. ${e.sec ? e.sec + '초' : '1분'} 뒤에 다시 눌러 주세요.` : e.kind === 'day' ? '이 키의 오늘 무료 사용량(하루 한도)을 다 썼어요. 내일 다시 쓰거나 AI Studio에서 결제를 연결해야 해요.' : '무료 사용 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.') + ' (걸린 모델: ' + (e.models || []).join(', ') + ')' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
       } finally { busy = false; }
     }
     go.onclick = () => send(inp.value);
