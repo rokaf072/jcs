@@ -719,19 +719,30 @@ function chooseGuest() {
 async function handleShared() {
   if (!/[?&]shared=1/.test(location.search)) return;
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
-  let url = '';
+  let url = '', shared = '';
   try {
     const c = await caches.open('jcs-share');
     const ir = await c.match('shared-image'), tr = await c.match('shared-text');
     await c.delete('shared-image'); await c.delete('shared-text');
     if (ir) url = await sharedToDataUrl(await ir.blob());
-    else if (tr) { const m = (await tr.text()).match(/https?:\/\/\S+/); if (m) url = m[0]; }
+    else if (tr) shared = await tr.text();
   } catch (e) {}
-  if (!url) { status('공유된 사진을 받지 못했어요. 사진을 길게 눌러 [이미지 공유]로 보내주세요.', true); return; }
-  if (!url.startsWith('data:')) {   // 사진이 아니라 페이지 주소가 온 경우 확인
-    const ok = await new Promise((r) => { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.onload = () => r(im.naturalWidth > 60); im.onerror = () => r(false); im.src = url; setTimeout(() => r(false), 6000); });
-    if (!ok) { status('사진이 아니라 페이지 주소가 왔어요. 사진을 길게 눌러 [이미지 공유]로 보내주세요.', true); return; }
+  // 사진 파일 대신 주소가 온 경우: 주소 안에 숨은 원본 사진 주소를 찾아냄 (구글 imgurl=, 네이버 src= 등)
+  if (!url && shared) {
+    const cands = [];
+    for (const m of shared.match(/https?:\/\/[^\s"'<>]+/g) || []) {
+      try {
+        const x = new URL(m);
+        for (const k of ['imgurl', 'mediaurl', 'src', 'url', 'u', 'image', 'img']) { const v = x.searchParams.get(k); if (v && /^https?:/.test(v)) cands.push(v); }
+      } catch (e) {}
+      cands.push(m);
+    }
+    for (const c of cands) {
+      const ok = await new Promise((r) => { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.onload = () => r(im.naturalWidth > 60); im.onerror = () => r(false); im.src = c; setTimeout(() => r(false), 6000); });
+      if (ok) { url = c; break; }
+    }
   }
+  if (!url) { status('받은 것에서 사진을 찾지 못했어요. 받은 내용: ' + (shared ? shared.slice(0, 120) : '없음'), true); return; }
   let g = store.get('pendingPick');
   if (!g || Date.now() - g.t > 3600000) g = await chooseGuest();
   if (!g) return;
