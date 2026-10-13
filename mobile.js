@@ -200,6 +200,8 @@ function openPicker(g, ph) {
   const r1 = el('div', 'mrow');
   const ga = el('a', null, '구글에서 찾기'); ga.href = 'https://www.google.com/search?udm=2&q=' + q; ga.target = '_blank';
   const na = el('a', null, '네이버에서 찾기'); na.href = 'https://m.search.naver.com/search.naver?where=m_image&query=' + q; na.target = '_blank';
+  // 이 사람 사진을 찾으러 간다고 기억 → 사진을 [공유]로 보내면 바로 이 사람에게 들어감
+  ga.onclick = na.onclick = () => store.set('pendingPick', { name: g.name, role: g.role, t: Date.now() });
   const file = document.createElement('input'); file.type = 'file'; file.accept = 'image/*'; file.style.display = 'none';
   file.onchange = async () => {
     const f = file.files[0]; if (!f) return;
@@ -213,7 +215,7 @@ function openPicker(g, ph) {
   const r2 = el('div', 'mrow'); const inp = document.createElement('input'); inp.placeholder = '이미지 주소 붙여넣기';
   const okb = el('button', 'primary', '등록'); okb.onclick = () => { const u = inp.value.trim(); if (/^https?:/.test(u)) pickUrl(u); else inp.focus(); };
   r2.append(inp, okb);
-  bar.append(el('div', 'mtitle', '원하는 사진이 없으면 직접 등록'), r1, r2, el('div', 'mhelp', '찾은 사진을 길게 눌러 "이미지 주소 복사" 후 붙여넣거나, 사진을 저장해서 [갤러리 사진]으로 고르세요.'));
+  bar.append(el('div', 'mtitle', '원하는 사진이 없으면 직접 등록'), r1, r2, el('div', 'mhelp', '구글·네이버에서 마음에 드는 사진을 길게 눌러 [이미지 공유] → [정치쇼]를 고르면 바로 등록돼요. (사진을 한 번 눌러 크게 띄운 뒤 길게 누르면 더 선명해요)'));
   box.insertBefore(bar, grid);
   const section = (t) => { const w = el('div', 'pmsg', '찾는 중…'), end = el('div', 'pend'); grid.append(el('div', 'psec', t), w, end); return { w, end }; };
   const add = (sec, it) => {
@@ -694,8 +696,58 @@ async function knownPhoto(name, role) {
   const m = store.get('manual:' + name); if (m && m.url) return m.url;
   const a = store.get('auto:' + name + '|' + role); return (a && a.url) || '';
 }
+// ───────── 다른 앱에서 [공유]로 보낸 사진 받기 ─────────
+async function sharedToDataUrl(blob) {
+  const bmp = await createImageBitmap(blob); const k = Math.min(1, 480 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+function chooseGuest() {
+  return new Promise(async (resolve) => {
+    for (let i = 0; i < 40 && !current; i++) await new Promise((r) => setTimeout(r, 250));
+    const guests = [];
+    if (current) for (const p of current.parts || []) for (const c of p.corners || []) for (const g of c.guests || []) if (!guests.some((x) => x.name === g.name)) guests.push(g);
+    if (!guests.length) { alert('누구 사진인지 고를 출연자 목록이 없어요. 사진 고르기에서 [구글/네이버에서 찾기]로 시작해 주세요.'); return resolve(null); }
+    const ov = el('div', 'overlay'), box = el('div', 'picker');
+    box.append(el('div', 'ptitle', '누구 사진인가요?'), el('div', 'psub', '받은 사진을 넣을 출연자를 고르세요'));
+    for (const g of guests) { const b = el('button', 'srow'); b.append(el('b', null, g.name), el('span', null, g.role || '')); b.onclick = () => { ov.remove(); resolve(g); }; box.append(b); }
+    const cl = el('button', 'pclose', '취소'); cl.onclick = () => { ov.remove(); resolve(null); }; box.append(cl);
+    ov.append(box); document.body.append(ov);
+  });
+}
+async function handleShared() {
+  if (!/[?&]shared=1/.test(location.search)) return;
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  let url = '';
+  try {
+    const c = await caches.open('jcs-share');
+    const ir = await c.match('shared-image'), tr = await c.match('shared-text');
+    await c.delete('shared-image'); await c.delete('shared-text');
+    if (ir) url = await sharedToDataUrl(await ir.blob());
+    else if (tr) { const m = (await tr.text()).match(/https?:\/\/\S+/); if (m) url = m[0]; }
+  } catch (e) {}
+  if (!url) { status('공유된 사진을 받지 못했어요. 사진을 길게 눌러 [이미지 공유]로 보내주세요.', true); return; }
+  if (!url.startsWith('data:')) {   // 사진이 아니라 페이지 주소가 온 경우 확인
+    const ok = await new Promise((r) => { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.onload = () => r(im.naturalWidth > 60); im.onerror = () => r(false); im.src = url; setTimeout(() => r(false), 6000); });
+    if (!ok) { status('사진이 아니라 페이지 주소가 왔어요. 사진을 길게 눌러 [이미지 공유]로 보내주세요.', true); return; }
+  }
+  let g = store.get('pendingPick');
+  if (!g || Date.now() - g.t > 3600000) g = await chooseGuest();
+  if (!g) return;
+  store.del('pendingPick');
+  status(`${g.name} 사진 등록 중…`);
+  const a = await analyze(url).catch(() => null);
+  const rec = { url, t: Date.now(), ...(a && a.faces && a.faces.length ? { cx: a.faces[0].cx, cy: a.faces[0].cy } : {}) };
+  store.set('manual:' + g.name, rec); store.del('none:' + g.name);
+  schedulePush();
+  for (let i = 0; i < 40 && !current; i++) await new Promise((r) => setTimeout(r, 250));
+  if (current) { const y = window.scrollY; render(current); window.scrollTo(0, y); }
+  status(`${g.name} 사진을 등록했어요 ✓`);
+}
 $('#search').onclick = openSearch;
 setTimeout(() => ensureIndex(), 10000);
 init();
 startLiveSync();
+handleShared();
 setTimeout(() => loadFace(), 0);
