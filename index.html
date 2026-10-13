@@ -64,6 +64,15 @@
   .photo .need { font-size:11px; color:#8a5a00; font-weight:700; margin-top:4px; }
   .gname { font-size:26px; font-weight:800; letter-spacing:-.5px; }
   .grole { font-size:15px; color:var(--sub); margin-top:2px; }
+
+  /* 직책 글자: 2초마다 왼쪽→오른쪽으로 빛이 스윽 지나가는 광택 (계속 반복) */
+  .grole { --sh1:var(--sub); --sh2:#3a9a8a; color:var(--sub);
+    background:linear-gradient(100deg, var(--sh1) 0%, var(--sh1) 40%, var(--sh2) 50%, var(--sh1) 60%, var(--sh1) 100%) 100% 0/300% 100% no-repeat;
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:jcsShine 2s linear infinite; }
+  html[data-theme="dark"] .grole { --sh2:#f4fffb; }
+  html.printing .grole { animation:none; background:none; -webkit-text-fill-color:currentColor; }
+  @keyframes jcsShine { 0% { background-position:100% 0; } 70%,100% { background-position:0 0; } }
+  @media (prefers-reduced-motion:reduce) { .grole { animation:none; background:none; -webkit-text-fill-color:currentColor; } }
   .gtools { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
   .gtools button, .gtools a { font-size:13px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--sub); text-decoration:none; }
   .gtools .del { color:#b3261e; border-color:#e8c4c1; }
