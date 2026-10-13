@@ -380,7 +380,9 @@
     for (let k = 0; k < models.length && k < 4; k++) {
       const model = models[k];
       for (let attempt = 0; attempt < 2; attempt++) {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        let r;
+        try { r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 20000); }
+        catch (e) { sawBusy = true; break; }   // 20초 넘게 답이 없으면 포기하고 다음 모델로
         if (r.ok) {
           const j = await r.json(); const t = (((j.candidates || [])[0] || {}).content || {}).parts;
           if (k > 0) { try { localStorage.setItem(AI_MODEL, JSON.stringify([model, ...models.filter((x) => x !== model)])); } catch (e) {} }   // 잘 된 모델을 다음부터 먼저
@@ -395,10 +397,14 @@
     }
     throw new Error(sawLimit ? 'LIMIT' : sawBusy ? 'BUSY' : 'MODEL');
   }
+  function fetchT(url, opt, ms) {
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+    return fetch(url, Object.assign({}, opt, { signal: ac.signal })).finally(() => clearTimeout(t));
+  }
   const AI_MODEL = 'jcsGeminiModels';
   async function pickModels(fresh) {
     if (!fresh) { try { const m = JSON.parse(localStorage.getItem(AI_MODEL) || 'null'); if (m && m.length) return m; } catch (e) {} }
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(aiKey())}`);
+    const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(aiKey())}`, {}, 15000);
     if (r.status === 400 || r.status === 403) throw new Error('KEY');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const list = ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
