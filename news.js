@@ -375,21 +375,29 @@
       + '대답은 한국어로, 짧고 쉽게, 필요하면 번호나 • 로 정리해. 기사에 있는 내용을 먼저 근거로 말하고, 기사에 없는 배경지식을 덧붙일 땐 "기사에는 없지만"이라고 밝혀. '
       + '모르는 건 지어내지 말고 모른다고 해. 정치 기사는 어느 편도 들지 말고 중립적으로 설명해.\n\n' + ctx;
     const body = { systemInstruction: { parts: [{ text: sys }] }, contents: history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })), generationConfig: { temperature: 0.4, maxOutputTokens: 1200 } };
-    // 구글이 모델 이름을 자주 바꿔서, 이 키로 쓸 수 있는 모델 목록을 받아 가장 알맞은 'flash' 모델을 자동으로 고름
-    for (let tryNo = 0; tryNo < 2; tryNo++) {
-      const model = await pickModel(tryNo > 0);
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (r.ok) { const j = await r.json(); const t = (((j.candidates || [])[0] || {}).content || {}).parts; return (t || []).map((x) => x.text || '').filter((x) => x).join('').trim() || '대답을 만들지 못했어요. 다시 물어봐 주세요.'; }
-      if (r.status === 429) throw new Error('LIMIT');
-      if (r.status === 400 || r.status === 403) { const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY'); }
-      if (r.status !== 404) throw new Error('HTTP ' + r.status);
-      try { localStorage.removeItem(AI_MODEL); } catch (e) {}   // 모델이 사라짐 → 목록 다시 받아서 재시도
+    // 구글이 모델 이름을 자주 바꾸고, 가끔 '붐빔(503)'이 나서: 쓸 수 있는 모델 목록을 받아 좋은 순서로 차례대로 시도
+    let models = await pickModels(false), sawLimit = false, sawBusy = false, refreshed = false;
+    for (let k = 0; k < models.length && k < 4; k++) {
+      const model = models[k];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (r.ok) {
+          const j = await r.json(); const t = (((j.candidates || [])[0] || {}).content || {}).parts;
+          if (k > 0) { try { localStorage.setItem(AI_MODEL, JSON.stringify([model, ...models.filter((x) => x !== model)])); } catch (e) {} }   // 잘 된 모델을 다음부터 먼저
+          return (t || []).map((x) => x.text || '').filter((x) => x).join('').trim() || '대답을 만들지 못했어요. 다시 물어봐 주세요.';
+        }
+        if (r.status === 400 || r.status === 403) { const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY'); break; }
+        if (r.status === 404) { if (!refreshed) { refreshed = true; models = await pickModels(true); k = -1; } break; }
+        if (r.status === 429) { sawLimit = true; break; }                       // 이 모델 사용량 끝 → 다른 모델로
+        if (r.status >= 500) { sawBusy = true; await new Promise((x) => setTimeout(x, 1500)); continue; }   // 붐빔 → 잠깐 뒤 한 번 더
+        break;
+      }
     }
-    throw new Error('MODEL');
+    throw new Error(sawLimit ? 'LIMIT' : sawBusy ? 'BUSY' : 'MODEL');
   }
-  const AI_MODEL = 'jcsGeminiModel';
-  async function pickModel(fresh) {
-    if (!fresh) { try { const m = localStorage.getItem(AI_MODEL); if (m) return m; } catch (e) {} }
+  const AI_MODEL = 'jcsGeminiModels';
+  async function pickModels(fresh) {
+    if (!fresh) { try { const m = JSON.parse(localStorage.getItem(AI_MODEL) || 'null'); if (m && m.length) return m; } catch (e) {} }
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(aiKey())}`);
     if (r.status === 400 || r.status === 403) throw new Error('KEY');
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -399,8 +407,8 @@
     const score = (n) => (/flash/.test(n) ? 100 : 0) - (/lite/.test(n) ? 30 : 0) - (/preview|exp/.test(n) ? 10 : 0) + (/latest/.test(n) ? 5 : 0) + ver(n);
     list.sort((a, b) => score(b) - score(a));
     if (!list.length) throw new Error('MODEL');
-    try { localStorage.setItem(AI_MODEL, list[0]); } catch (e) {}
-    return list[0];
+    try { localStorage.setItem(AI_MODEL, JSON.stringify(list)); } catch (e) {}
+    return list;
   }
   function aiPanel(i) {
     const wrap = el('div', 'aiw');
@@ -450,7 +458,7 @@
         const m = add('model', a); wait.remove(); void m;
       } catch (e) {
         hist.pop(); wait.remove();
-        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 쓸 수 있는 AI 모델을 찾지 못했어요. Google AI Studio에서 키를 새로 만들어 보세요.' : e.message === 'LIMIT' ? '오늘 무료 사용량을 다 썼거나 너무 빨리 물어봤어요. 잠시 뒤 다시 해 주세요.' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
+        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 쓸 수 있는 AI 모델을 찾지 못했어요. Google AI Studio에서 키를 새로 만들어 보세요.' : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? '오늘 무료 사용량을 다 썼거나 너무 빨리 물어봤어요. 잠시 뒤 다시 해 주세요.' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
       } finally { busy = false; }
     }
     go.onclick = () => send(inp.value);
