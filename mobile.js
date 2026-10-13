@@ -304,6 +304,8 @@ function render(post) {
   const raw = el('details', 'raw');
   raw.append(el('summary', null, '작가 원문 보기'), el('pre', null, `${post.title}\n\n${post.body}`));
   main.append(raw);
+  // 코너 주제·요약 속 용어와 한자(李·尹·與野 등)에 밑줄 → 누르면 설명
+  main.querySelectorAll('.topic, .cname, .summary').forEach((e) => { if (window.jcsMarkTerms) window.jcsMarkTerms(e); if (window.jcsMarkHanja) window.jcsMarkHanja(e); });
   status(`작가 등록 ${post.registered || '-'}`);
   document.dispatchEvent(new CustomEvent('jcsrender'));
 }

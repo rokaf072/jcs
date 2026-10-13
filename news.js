@@ -108,6 +108,8 @@
     lastData = data;
     if (!data || !data.items.length) { box.append(el('p', 'nempty', loading ? '기사를 불러오는 중이에요…' : '기사를 불러오지 못했어요. 인터넷 연결을 확인하고 [새로 받기]를 눌러주세요.')); return; }
     const items = uniq(data.items);
+    window.jcsNews = { items, isSbs: (i) => i.sbsQ || RE_SBS.test(i.title + ' ' + i.desc), isPol: (i) => RE_POL.test(i.title + ' ' + i.desc) && !isEnt(i), open: (i) => openArticle(i), title: cleanTitle };
+    document.dispatchEvent(new CustomEvent('jcsnews'));
     for (const i of items) if (!(i.sum && i.sum.length)) { try { const c = localStorage.getItem('jcsSum:' + keyOf(i.title)); if (c) Object.assign(i, JSON.parse(c)); } catch (e) {} }
     // 1) SBS 관련 — 무조건 맨 위
     // 순서: 신문사별(정치 → 방송·언론, SBS 기사는 빨간 표시) → 맨 아래 SBS 예능·드라마·연예
@@ -317,16 +319,20 @@
       if (Math.abs(dx) > 90 && Math.abs(dy) < 60 && Date.now() - st < 600 && !(window.getSelection() + '')) closeOv();
     }, { passive: true });
     const top = el('div', 'ntop'); top.append(el('span', 'npaper', i.paper), el('span', 'ntime', hm(i.t)), close);
-    box.append(top, el('h3', 'nh', cleanTitle(i.title)));
+    const nh = el('h3', 'nh', cleanTitle(i.title));
+    if (window.jcsMarkTerms) window.jcsMarkTerms(nh);   // 제목의 용어·한자도 누르면 설명
+    if (window.jcsMarkHanja) window.jcsMarkHanja(nh);
+    box.append(top, nh);
     if (i.img) { const im = document.createElement('img'); im.className = 'nimg'; im.referrerPolicy = 'no-referrer'; im.src = i.img; im.onerror = () => im.remove(); box.append(im); }
     if (i.sum && i.sum.length) {
       // 2~3문장씩 묶어 문단으로 (읽기 편하게)
       const wrap = el('div', 'nsum');
       for (let k = 0; k < i.sum.length; k += 2) wrap.append(el('p', null, i.sum.slice(k, k + 2).join(' ')));
       if (window.jcsMarkTerms) window.jcsMarkTerms(wrap);   // 어려운 용어에 밑줄 → 누르면 설명
-      box.append(el('div', 'nlabel', '요약'), wrap, el('div', 'nhint', '밑줄 친 용어를 누르면 설명이 나와요. 다른 단어는 길게 눌러(PC는 마우스로 끌어) 고르면 찾아봐요.'));
+      if (window.jcsMarkHanja) window.jcsMarkHanja(wrap);
+      box.append(el('div', 'nlabel', '요약'), wrap, el('div', 'nhint', '밑줄 친 용어·한자를 누르면 설명이 나와요. 다른 단어는 길게 눌러(PC는 마우스로 끌어) 고르면 찾아봐요.'));
     } else {
-      if (i.desc) { const d = el('div', 'nsum'); d.append(el('p', null, i.desc)); if (window.jcsMarkTerms) window.jcsMarkTerms(d); box.append(d); }
+      if (i.desc) { const d = el('div', 'nsum'); d.append(el('p', null, i.desc)); if (window.jcsMarkTerms) window.jcsMarkTerms(d); if (window.jcsMarkHanja) window.jcsMarkHanja(d); box.append(d); }
       const wait = el('p', 'nempty', IS_EXT ? '요약을 만드는 중이에요… (몇 초)' : '이 기사는 아직 요약을 만들지 못했어요. 잠시 후 다시 열어 보세요.');
       box.append(wait);
       if (IS_EXT && !i.__trying) {

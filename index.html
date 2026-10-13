@@ -194,6 +194,11 @@
   .part.onair-part > h2 { color:#ff4d5e; }
   .part.onair-part > h2::after { content:'● ON AIR'; font-size:11px; font-weight:900; color:#fff; background:#ff2d45; padding:2px 7px; border-radius:6px; margin-left:auto; }
   .part.onair-part .corner { border-color:rgba(255,45,69,.4); }
+  .hterm { border-bottom:2px dotted #f0b429; cursor:pointer; }
+  .hterm.eterm, html[data-theme="dark"] .hterm.eterm { border-bottom-color:#60a5fa; }
+  html[data-theme="dark"] .hterm { border-bottom-color:#fbbf24; }
+  .gbub .gtxt { white-space:pre-line; }
+  html.printing .hterm { border-bottom:none; }
 </style>
 </head>
 <body>
@@ -220,6 +225,7 @@
 <script src="parser.js"></script>
 <script src="mobile.js"></script>
 <script src="glossary.js"></script>
+<script src="hanja.js"></script>
 <script src="news.js"></script>
 <script src="onair.js"></script>
 </body>

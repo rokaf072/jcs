@@ -438,6 +438,32 @@ window.JCS_GLOSSARY = {
     bubble.style.top = (below ? r.bottom + 8 : r.top - bubble.offsetHeight - 8) + 'px';
     return p;
   }
+  window.jcsBubble = show;
+  // 위키백과에서 찾아 말풍선에 보여주기 (후보 단어를 차례로 시도)
+  async function wiki(anchor, cands, title, dictUrl) {
+    const p = show(anchor, title || cands[0], '찾는 중…');
+    const hitG = cands.find((c) => G[c]);
+    if (hitG) { p.textContent = G[hitG]; return; }
+    try {
+      let j = null, used = cands[0];
+      for (const c of cands) {
+        const r = await fetch('https://ko.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(c.replace(/\s+/g, '_')));
+        j = r.ok ? await r.json() : null;
+        if (j && j.extract && j.type !== 'disambiguation') { used = c; break; }
+        j = null;
+      }
+      if (j) {
+        if (!title && bubble) bubble.querySelector('b').textContent = used;
+        p.textContent = j.extract.split(/(?<=[.다])\s+/).slice(0, 2).join(' ');
+        const a = document.createElement('a'); a.href = j.content_urls && j.content_urls.mobile ? j.content_urls.mobile.page : 'https://ko.wikipedia.org/wiki/' + encodeURIComponent(used);
+        a.target = '_blank'; a.rel = 'noopener'; a.textContent = '위키백과에서 더 보기'; a.className = 'gmore'; bubble && bubble.append(a);
+      } else {
+        p.textContent = title && title !== cands[0] ? '읽는 법은 위와 같아요. 사전에서 뜻을 찾아보세요.' : '사전에서 찾지 못했어요.';
+        const a = document.createElement('a'); a.href = dictUrl || 'https://ko.dict.naver.com/#/search?query=' + encodeURIComponent(cands[0]); a.target = '_blank'; a.rel = 'noopener'; a.textContent = dictUrl ? '네이버 영어사전에서 찾기' : '네이버 국어사전에서 찾기'; a.className = 'gmore'; bubble && bubble.append(a);
+      }
+    } catch (e) { p.textContent = '인터넷 연결을 확인해 주세요.'; }
+  }
+  window.jcsWiki = wiki;
   // 요약 문단 속 용어에 밑줄 달기
   window.jcsMarkTerms = (el) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -467,34 +493,20 @@ window.JCS_GLOSSARY = {
   }
   // 사전에 없는 단어: 길게 눌러 고르거나 마우스로 끌어 고르면 위키백과에서 찾아봄
   const lookup = async () => {
-    const sel = window.getSelection(); const word = (sel && sel.toString() || '').trim().replace(/[^\w가-힣\s·]/g, '').trim();
-    if (!word || word.length < 2 || word.length > 15 || !sel.rangeCount) return;
+    const sel = window.getSelection(); let raw = (sel && sel.toString() || '').trim();
+    // 한자가 섞여 있으면 한글 읽기로 바꿔서 찾음 (예: 與野 → 여야)
+    const hasH = /[\u4E00-\u9FFF\uF900-\uFAFF]/.test(raw);
+    const conv = hasH && window.jcsHanjaRead ? raw.replace(/[\u4E00-\u9FFF\uF900-\uFAFF]+/g, (h) => window.jcsHanjaRead(h)) : raw;
+    const word = conv.replace(/[^\w가-힣\s·]/g, '').trim();
+    if (!word || word.length < (hasH ? 1 : 2) || word.length > 15 || !sel.rangeCount) return;
     const node = sel.anchorNode && sel.anchorNode.parentElement;
-    if (!node || !node.closest('.nsum')) return;
+    if (!node || !node.closest('.nbox, #main, .rail, .news, .airbar')) return;   // 기사·출연자 화면 어디서든
+    if (node.closest('input, textarea, select')) return;
     const anchor = { getBoundingClientRect: () => sel.getRangeAt(0).getBoundingClientRect() };
-    // 길게 누르면 "국정감사에서", "필리버스터를"처럼 조사까지 같이 잡히므로 떼어내고 찾음
     const cands = baseForms(word);
     const hitG = cands.find((c) => G[c]) || terms.find((t) => word.startsWith(t) && t.length >= 2);
-    if (hitG) { show(anchor, hitG, G[hitG]); return; }
-    const p = show(anchor, cands[0], '찾는 중…');
-    try {
-      let j = null;
-      for (const c of cands) {
-        const r = await fetch('https://ko.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(c.replace(/\s+/g, '_')));
-        j = r.ok ? await r.json() : null;
-        if (j && j.extract && j.type !== 'disambiguation') { if (bubble) bubble.querySelector('b').textContent = c; break; }
-        j = null;
-      }
-      if (j && j.extract && j.type !== 'disambiguation') {
-        const two = j.extract.split(/(?<=[.다])\s+/).slice(0, 2).join(' ');
-        p.textContent = two;
-        const a = document.createElement('a'); a.href = j.content_urls && j.content_urls.mobile ? j.content_urls.mobile.page : 'https://ko.wikipedia.org/wiki/' + encodeURIComponent(word);
-        a.target = '_blank'; a.rel = 'noopener'; a.textContent = '위키백과에서 더 보기'; a.className = 'gmore'; bubble && bubble.append(a);
-      } else {
-        p.textContent = '사전에서 찾지 못했어요.';
-        const a = document.createElement('a'); a.href = 'https://ko.dict.naver.com/#/search?query=' + encodeURIComponent(word); a.target = '_blank'; a.rel = 'noopener'; a.textContent = '네이버 국어사전에서 찾기'; a.className = 'gmore'; bubble && bubble.append(a);
-      }
-    } catch (e) { p.textContent = '인터넷 연결을 확인해 주세요.'; }
+    if (hitG) { show(anchor, hasH ? `${raw} [${hitG}]` : hitG, G[hitG]); return; }
+    wiki(anchor, cands, hasH ? `${raw} [${word}]` : null, /^[A-Za-z][A-Za-z\s]*$/.test(word) ? 'https://en.dict.naver.com/#/search?query=' + encodeURIComponent(word) : null);
   };
   document.addEventListener('mouseup', () => setTimeout(lookup, 10));
   document.addEventListener('selectionchange', () => { clearTimeout(window.__gsel); window.__gsel = setTimeout(() => { const s = window.getSelection(); if (s && s.toString().trim() && /Android|iPhone/i.test(navigator.userAgent)) lookup(); }, 700); });
