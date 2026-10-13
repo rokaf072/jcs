@@ -778,6 +778,23 @@ async function handleShared() {
   if (current) { const y = window.scrollY; render(current); window.scrollTo(0, y); }
   status(`${g.name} 사진을 등록했어요 ✓`);
 }
+// ───────── 신문까지 내려갔을 때 한 번에 출연자(맨 위)로 ─────────
+(() => {
+  const top = el('button', 'totop', '▲ 출연자');
+  top.title = '맨 위 출연자로';
+  top.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.body.append(top);
+  const news = document.getElementById('news');
+  const check = () => {
+    const past = news ? news.getBoundingClientRect().top < window.innerHeight * 0.5 : window.scrollY > 1200;
+    top.classList.toggle('show', past || window.scrollY > 2500);
+  };
+  window.addEventListener('scroll', check, { passive: true });
+  check();
+  // 맨 위 제목을 눌러도 맨 위로
+  const h1 = document.querySelector('header h1');
+  if (h1) { h1.style.cursor = 'pointer'; h1.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' }); }
+})();
 $('#search').onclick = openSearch;
 setTimeout(() => ensureIndex(), 10000);
 init();

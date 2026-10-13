@@ -199,6 +199,9 @@
   html[data-theme="dark"] .hterm { border-bottom-color:#fbbf24; }
   .gbub .gtxt { white-space:pre-line; }
   html.printing .hterm { border-bottom:none; }
+  .totop { position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translate(-50%, 90px); z-index:40; border:none; border-radius:999px; padding:12px 22px; font:inherit; font-size:15px; font-weight:800; color:#0b1f1b; background:linear-gradient(135deg,#14b8a6,#4fd1b5); box-shadow:0 8px 24px rgba(0,0,0,.45); transition:transform .25s; }
+  .totop.show { transform:translate(-50%, 0); }
+  html.nlock .totop { display:none; }
 </style>
 </head>
 <body>
