@@ -372,26 +372,34 @@
   async function askGemini(i, history) {
     const ctx = `신문사: ${i.paper}\n날짜: ${hm(i.t)}\n제목: ${cleanTitle(i.title)}\n기사 내용(요약본):\n${(i.sum && i.sum.length ? i.sum.join(' ') : i.desc || '')}`;
     const sys = '너는 한국 신문 기사를 쉽게 풀어 설명해 주는 도우미야. 아래 기사를 이미 읽었어. 사용자는 정치·경제 용어에 익숙하지 않은 일반인이야. '
-      + '대답은 한국어로, 짧고 쉽게, 필요하면 번호나 • 로 정리해. 기사에 있는 내용을 먼저 근거로 말하고, 기사에 없는 배경지식을 덧붙일 땐 "기사에는 없지만"이라고 밝혀. '
+      + '대답은 한국어로, 쉬운 말로 충분히 자세하게(보통 6~10문장) 설명해. 처음부터 끝까지 완전한 문장으로 마무리하고, 필요하면 번호나 • 로 정리해. 용어는 괄호로 뜻을 풀어 줘. 기사에 있는 내용을 먼저 근거로 말하고, 기사에 없는 배경지식을 덧붙일 땐 "기사에는 없지만"이라고 밝혀. '
       + '모르는 건 지어내지 말고 모른다고 해. 정치 기사는 어느 편도 들지 말고 중립적으로 설명해.\n\n' + ctx;
-    const body = { systemInstruction: { parts: [{ text: sys }] }, contents: history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })), generationConfig: { temperature: 0.4, maxOutputTokens: 1200 } };
+    const body = { systemInstruction: { parts: [{ text: sys }] }, contents: history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })), generationConfig: { temperature: 0.4, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } };   // 생각 시간을 꺼서 빠르게
     // 구글이 모델 이름을 자주 바꾸고, 가끔 '붐빔(503)'이 나서: 쓸 수 있는 모델 목록을 받아 좋은 순서로 차례대로 시도
     let models = await pickModels(false), sawLimit = false, sawBusy = false, refreshed = false;
-    for (let k = 0; k < models.length && k < 4; k++) {
+    for (let k = 0; k < models.length && k < 5; k++) {
       const model = models[k];
-      for (let attempt = 0; attempt < 2; attempt++) {
+      let useBody = body;
+      for (let attempt = 0; attempt < 3; attempt++) {
         let r;
-        try { r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 20000); }
-        catch (e) { sawBusy = true; break; }   // 20초 넘게 답이 없으면 포기하고 다음 모델로
+        try { r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(useBody) }, 12000); }
+        catch (e) { sawBusy = true; break; }   // 12초 넘게 답이 없으면 포기하고 다음 모델로
         if (r.ok) {
           const j = await r.json(); const t = (((j.candidates || [])[0] || {}).content || {}).parts;
           if (k > 0) { try { localStorage.setItem(AI_MODEL, JSON.stringify([model, ...models.filter((x) => x !== model)])); } catch (e) {} }   // 잘 된 모델을 다음부터 먼저
-          return (t || []).map((x) => x.text || '').filter((x) => x).join('').trim() || '대답을 만들지 못했어요. 다시 물어봐 주세요.';
+          const cand = (j.candidates || [])[0] || {};
+          let out = (t || []).filter((x) => !x.thought).map((x) => x.text || '').filter((x) => x).join('').trim();
+          if (out && cand.finishReason === 'MAX_TOKENS') out += ' …(길어서 여기서 끊겼어요. "계속 설명해줘"라고 보내 보세요)';
+          return out || '대답을 만들지 못했어요. 다시 물어봐 주세요.';
         }
-        if (r.status === 400 || r.status === 403) { const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY'); break; }
+        if (r.status === 400 || r.status === 403) {
+          const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY');
+          if (useBody === body && /think/i.test(JSON.stringify(j))) { const g = Object.assign({}, body.generationConfig); delete g.thinkingConfig; useBody = Object.assign({}, body, { generationConfig: g }); continue; }   // 이 모델은 '생각 끄기'를 못 받음 → 빼고 다시
+          break;
+        }
         if (r.status === 404) { if (!refreshed) { refreshed = true; models = await pickModels(true); k = -1; } break; }
         if (r.status === 429) { sawLimit = true; break; }                       // 이 모델 사용량 끝 → 다른 모델로
-        if (r.status >= 500) { sawBusy = true; await new Promise((x) => setTimeout(x, 1500)); continue; }   // 붐빔 → 잠깐 뒤 한 번 더
+        if (r.status >= 500) { sawBusy = true; if (attempt >= 1) break; await new Promise((x) => setTimeout(x, 1000)); continue; }   // 붐빔 → 잠깐 뒤 한 번 더
         break;
       }
     }
@@ -401,7 +409,7 @@
     const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
     return fetch(url, Object.assign({}, opt, { signal: ac.signal })).finally(() => clearTimeout(t));
   }
-  const AI_MODEL = 'jcsGeminiModels';
+  const AI_MODEL = 'jcsGeminiModels2';
   async function pickModels(fresh) {
     if (!fresh) { try { const m = JSON.parse(localStorage.getItem(AI_MODEL) || 'null'); if (m && m.length) return m; } catch (e) {} }
     const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(aiKey())}`, {}, 15000);
@@ -410,7 +418,7 @@
     const list = ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map((m) => m.name.replace(/^models\//, '')).filter((n) => /^gemini/.test(n) && !/image|tts|audio|live|embed|vision|robotics|computer/.test(n));
     const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0');
-    const score = (n) => (/flash/.test(n) ? 100 : 0) - (/lite/.test(n) ? 30 : 0) - (/preview|exp/.test(n) ? 10 : 0) + (/latest/.test(n) ? 5 : 0) + ver(n);
+    const score = (n) => (/flash/.test(n) ? 100 : 0) - (/lite/.test(n) ? 30 : 0) - (/preview|exp/.test(n) ? 10 : 0) - (/pro/.test(n) ? 60 : 0) + (/latest/.test(n) ? 5 : 0) + ver(n);
     list.sort((a, b) => score(b) - score(a));
     if (!list.length) throw new Error('MODEL');
     try { localStorage.setItem(AI_MODEL, JSON.stringify(list)); } catch (e) {}
