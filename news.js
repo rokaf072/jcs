@@ -356,7 +356,92 @@
       }
     }
     const src = el('a', 'nsrc', '원문 기사 보기 (신문사 사이트, 광고 있음)'); src.href = i.url || i.link; src.target = '_blank'; src.rel = 'noopener noreferrer';
-    box.append(src); ov.append(box); document.body.append(ov);
+    const ai = aiPanel(i);
+    box.append(ai, src); ov.append(box); document.body.append(ov);
+    // ✕ 위에 떠 있는 🤖 버튼: 읽다가 어디서든 바로 AI에게 질문
+    const aifab = el('button', 'nfab aifab', '🤖'); aifab.title = 'AI에게 이 기사 물어보기';
+    aifab.onclick = (e) => { e.stopPropagation(); const b = ai.querySelector('.aibtn'); if (b) b.click(); ai.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => { const inp = ai.querySelector('input'); if (inp && aiKey()) inp.focus({ preventScroll: true }); }, 500); };
+    ov.append(aifab);
+  }
+  // ── 🤖 AI에게 물어보기: 이 기사를 미리 읽은 AI(구글 Gemini 무료)에게 질문 ──
+  const AI_KEY = 'jcsGeminiKey';
+  const aiKey = () => { try { return localStorage.getItem(AI_KEY) || ''; } catch (e) { return ''; } };
+  const aiChats = new Map();   // 기사별 대화 기억 (앱을 켜둔 동안)
+  const esc = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const fmt = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^\s*[-*] /gm, '• ').replace(/\n/g, '<br>');
+  async function askGemini(i, history) {
+    const ctx = `신문사: ${i.paper}\n날짜: ${hm(i.t)}\n제목: ${cleanTitle(i.title)}\n기사 내용(요약본):\n${(i.sum && i.sum.length ? i.sum.join(' ') : i.desc || '')}`;
+    const sys = '너는 한국 신문 기사를 쉽게 풀어 설명해 주는 도우미야. 아래 기사를 이미 읽었어. 사용자는 정치·경제 용어에 익숙하지 않은 일반인이야. '
+      + '대답은 한국어로, 짧고 쉽게, 필요하면 번호나 • 로 정리해. 기사에 있는 내용을 먼저 근거로 말하고, 기사에 없는 배경지식을 덧붙일 땐 "기사에는 없지만"이라고 밝혀. '
+      + '모르는 건 지어내지 말고 모른다고 해. 정치 기사는 어느 편도 들지 말고 중립적으로 설명해.\n\n' + ctx;
+    const body = { systemInstruction: { parts: [{ text: sys }] }, contents: history.map((m) => ({ role: m.role, parts: [{ text: m.text }] })), generationConfig: { temperature: 0.4, maxOutputTokens: 1200 } };
+    let lastErr = '';
+    for (const model of ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) { const j = await r.json(); const t = (((j.candidates || [])[0] || {}).content || {}).parts; return (t || []).map((x) => x.text || '').join('').trim() || '대답을 만들지 못했어요. 다시 물어봐 주세요.'; }
+      if (r.status === 400 || r.status === 403) { const j = await r.json().catch(() => ({})); if (/API key|API_KEY|permission/i.test(JSON.stringify(j))) throw new Error('KEY'); lastErr = 'HTTP ' + r.status; continue; }
+      if (r.status === 429) throw new Error('LIMIT');
+      lastErr = 'HTTP ' + r.status;   // 404 등: 다음 모델로
+    }
+    throw new Error(lastErr || 'ERR');
+  }
+  function aiPanel(i) {
+    const wrap = el('div', 'aiw');
+    const btn = el('button', 'aibtn', '🤖 AI에게 이 기사 물어보기');
+    wrap.append(btn);
+    btn.onclick = () => { btn.remove(); wrap.append(aiBody(i)); };
+    if (aiChats.has(i.title)) { btn.remove(); wrap.append(aiBody(i)); }
+    return wrap;
+  }
+  function aiBody(i) {
+    const box = el('div', 'aibox');
+    if (!aiKey()) {   // 처음 한 번: 무료 키 넣기
+      box.append(el('div', 'aihead', '🤖 AI 설정 (처음 한 번만)'));
+      const p = el('div', 'aihelp');
+      p.innerHTML = '구글의 무료 AI(Gemini)를 써요. 아래 순서로 무료 키를 받아 붙여넣어 주세요.<br>'
+        + '1. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a> 열기 (구글 로그인)<br>'
+        + '2. <b>[API 키 만들기]</b> 누르기 → 나온 키(AIza…로 시작) 복사<br>3. 아래 칸에 붙여넣고 [저장]<br>'
+        + '<span class="aisub">키는 이 기기에만 저장돼요. 무료라 하루 사용량에 제한이 있어요.</span>';
+      const row = el('div', 'airow'); const inp = document.createElement('input'); inp.placeholder = 'AIza… 로 시작하는 키 붙여넣기';
+      const ok = el('button', 'aisend', '저장');
+      ok.onclick = () => { const v = inp.value.trim(); if (!/^AIza[\w-]{20,}$/.test(v)) { inp.focus(); inp.placeholder = '키가 맞지 않아요. AIza로 시작하는 키를 붙여넣어 주세요'; inp.value = ''; return; } try { localStorage.setItem(AI_KEY, v); } catch (e) {} box.replaceWith(aiBody(i)); };
+      row.append(inp, ok); box.append(p, row);
+      return box;
+    }
+    const hist = aiChats.get(i.title) || []; aiChats.set(i.title, hist);
+    const log = el('div', 'ailog');
+    const add = (role, text) => {
+      const m = el('div', 'aimsg ' + (role === 'user' ? 'me' : 'ai'));
+      if (role === 'user') m.textContent = text; else { m.innerHTML = fmt(text); if (window.jcsMarkTerms) window.jcsMarkTerms(m); if (window.jcsMarkHanja) window.jcsMarkHanja(m); }
+      log.append(m); m.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return m;
+    };
+    for (const m of hist) add(m.role, m.text);
+    const chips = el('div', 'aichips');
+    for (const q of ['이 기사 한 줄로 요약해줘', '쉽게 풀어서 설명해줘', '왜 중요한 뉴스야?', '배경이 뭐야?', '어려운 용어 설명해줘', '앞으로 어떻게 될까?']) {
+      const c = el('button', 'aichip', q); c.onclick = () => send(q); chips.append(c);
+    }
+    const row = el('div', 'airow'); const inp = document.createElement('input'); inp.placeholder = '이 기사에 대해 무엇이든 물어보세요';
+    const go = el('button', 'aisend', '보내기');
+    let busy = false;
+    async function send(q) {
+      q = (q || '').trim(); if (!q || busy) return;
+      busy = true; inp.value = ''; add('user', q); hist.push({ role: 'user', text: q });
+      const wait = add('model', '생각하는 중…'); wait.classList.add('wait');
+      try {
+        const a = await askGemini(i, hist);
+        hist.push({ role: 'model', text: a });
+        const m = add('model', a); wait.remove(); void m;
+      } catch (e) {
+        hist.pop(); wait.remove();
+        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'LIMIT' ? '오늘 무료 사용량을 다 썼거나 너무 빨리 물어봤어요. 잠시 뒤 다시 해 주세요.' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
+      } finally { busy = false; }
+    }
+    go.onclick = () => send(inp.value);
+    inp.onkeydown = (e) => { if (e.key === 'Enter' && !e.isComposing) send(inp.value); };
+    row.append(inp, go);
+    const reset = el('button', 'aireset', '키 다시 넣기'); reset.onclick = () => { try { localStorage.removeItem(AI_KEY); } catch (e) {} box.replaceWith(aiBody(i)); };
+    box.append(el('div', 'aihead', '🤖 AI에게 물어보기 · 이 기사를 읽은 상태예요'), log, chips, row, reset);
+    return box;
   }
   let busy = false;
   async function refresh(force) {
