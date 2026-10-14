@@ -422,13 +422,32 @@ window.JCS_GLOSSARY = {
   const RE = new RegExp(terms.map(esc).join('|'), 'g');
   let bubble = null;
   const hide = () => { if (bubble) { bubble.remove(); bubble = null; } };
-  function show(anchor, title, html, link) {
+  // 말풍선 아래 버튼: AI 풀이(이 기사 맥락) · 나무위키 · 지식백과(시사상식)
+  function tools(term, p) {
+    const row = document.createElement('div'); row.className = 'gtools';
+    const mk = (label, href) => { const a = document.createElement('a'); a.textContent = label; a.href = href; a.target = '_blank'; a.rel = 'noopener'; row.append(a); return a; };
+    if (window.jcsAskTerm && document.querySelector('.nov')) {   // 기사를 보고 있을 때만
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = '🤖 AI 풀이';
+      b.onclick = async (e) => {
+        e.stopPropagation(); b.disabled = true; p.textContent = '🤖 이 기사에서 어떤 뜻인지 생각하는 중…';
+        try { p.textContent = await window.jcsAskTerm(term); } catch (err) { p.textContent = err.message || 'AI 연결에 실패했어요.'; }
+        b.disabled = false;
+      };
+      row.append(b);
+    }
+    mk('나무위키', 'https://namu.wiki/w/' + encodeURIComponent(term));
+    mk('지식백과', 'https://terms.naver.com/search.naver?query=' + encodeURIComponent(term));
+    return row;
+  }
+  const termOf = (title) => { const m = String(title || '').match(/\[([^\]]+)\]/); return (m ? m[1] : String(title || '')).trim(); };
+  function show(anchor, title, html, link, term) {
     hide();
     bubble = document.createElement('div'); bubble.className = 'gbub';
     const h = document.createElement('b'); h.textContent = title;
     const p = document.createElement('div'); p.className = 'gtxt'; p.textContent = html;
     bubble.append(h, p);
     if (link) { const a = document.createElement('a'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '더 보기'; a.className = 'gmore'; bubble.append(a); }
+    bubble.append(tools(term || termOf(title), p));
     document.body.append(bubble);
     const r = anchor.getBoundingClientRect(), bw = Math.min(320, window.innerWidth - 20);
     bubble.style.width = bw + 'px';
@@ -441,7 +460,7 @@ window.JCS_GLOSSARY = {
   window.jcsBubble = show;
   // 위키백과에서 찾아 말풍선에 보여주기 (후보 단어를 차례로 시도)
   async function wiki(anchor, cands, title, dictUrl) {
-    const p = show(anchor, title || cands[0], '찾는 중…');
+    const p = show(anchor, title || cands[0], '찾는 중…', null, cands[cands.length - 1]);
     const hitG = cands.find((c) => G[c]);
     if (hitG) { p.textContent = G[hitG]; return; }
     try {
@@ -456,10 +475,10 @@ window.JCS_GLOSSARY = {
         if (!title && bubble) bubble.querySelector('b').textContent = used;
         p.textContent = j.extract.split(/(?<=[.다])\s+/).slice(0, 2).join(' ');
         const a = document.createElement('a'); a.href = j.content_urls && j.content_urls.mobile ? j.content_urls.mobile.page : 'https://ko.wikipedia.org/wiki/' + encodeURIComponent(used);
-        a.target = '_blank'; a.rel = 'noopener'; a.textContent = '위키백과에서 더 보기'; a.className = 'gmore'; bubble && bubble.append(a);
+        a.target = '_blank'; a.rel = 'noopener'; a.textContent = '위키백과에서 더 보기'; a.className = 'gmore'; bubble && bubble.insertBefore(a, bubble.querySelector('.gtools'));
       } else {
-        p.textContent = title && title !== cands[0] ? '읽는 법은 위와 같아요. 사전에서 뜻을 찾아보세요.' : '사전에서 찾지 못했어요.';
-        const a = document.createElement('a'); a.href = dictUrl || 'https://ko.dict.naver.com/#/search?query=' + encodeURIComponent(cands[0]); a.target = '_blank'; a.rel = 'noopener'; a.textContent = dictUrl ? '네이버 영어사전에서 찾기' : '네이버 국어사전에서 찾기'; a.className = 'gmore'; bubble && bubble.append(a);
+        p.textContent = window.jcsAskTerm && document.querySelector('.nov') ? '간단한 설명을 찾지 못했어요. 아래 [🤖 AI 풀이]나 나무위키를 눌러 보세요.' : '간단한 설명을 찾지 못했어요. 아래 나무위키·지식백과를 눌러 보세요.';
+        if (dictUrl) { const a = document.createElement('a'); a.href = dictUrl; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '네이버 영어사전에서 찾기'; a.className = 'gmore'; bubble && bubble.insertBefore(a, bubble.querySelector('.gtools')); }
       }
     } catch (e) { p.textContent = '인터넷 연결을 확인해 주세요.'; }
   }
@@ -481,7 +500,7 @@ window.JCS_GLOSSARY = {
   };
   document.addEventListener('click', (e) => {
     const t = e.target.closest && e.target.closest('.gterm');
-    if (t) { e.stopPropagation(); show(t, t.dataset.term, G[t.dataset.term]); return; }
+    if (t) { e.stopPropagation(); show(t, t.dataset.term, G[t.dataset.term], null, t.dataset.term); return; }
     if (bubble && !bubble.contains(e.target)) hide();
   }, true);
   // "국정감사에서" → ["국정감사에서", "국정감사"] 처럼 조사·어미를 떼어낸 후보들
@@ -505,10 +524,10 @@ window.JCS_GLOSSARY = {
     const anchor = { getBoundingClientRect: () => sel.getRangeAt(0).getBoundingClientRect() };
     const cands = baseForms(word);
     const hitG = cands.find((c) => G[c]) || terms.find((t) => word.startsWith(t) && t.length >= 2);
-    if (hitG) { show(anchor, hasH ? `${raw} [${hitG}]` : hitG, G[hitG]); return; }
+    if (hitG) { show(anchor, hasH ? `${raw} [${hitG}]` : hitG, G[hitG], null, hitG); return; }
     wiki(anchor, cands, hasH ? `${raw} [${word}]` : null, /^[A-Za-z][A-Za-z\s]*$/.test(word) ? 'https://en.dict.naver.com/#/search?query=' + encodeURIComponent(word) : null);
   };
   document.addEventListener('mouseup', () => setTimeout(lookup, 10));
   document.addEventListener('selectionchange', () => { clearTimeout(window.__gsel); window.__gsel = setTimeout(() => { const s = window.getSelection(); if (s && s.toString().trim() && /Android|iPhone/i.test(navigator.userAgent)) lookup(); }, 700); });
-  window.addEventListener('scroll', hide, true);
+  window.addEventListener('scroll', (e) => { if (bubble && e.target && e.target.nodeType === 1 && bubble.contains(e.target)) return; hide(); }, true);   // 말풍선 안을 스크롤할 땐 닫지 않음
 })();

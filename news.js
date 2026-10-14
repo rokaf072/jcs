@@ -92,19 +92,22 @@
   }
   // ── 기사 읽기 글씨: 명조(기본)·고딕, 크기 조절. 글꼴은 처음 기사를 열 때만 받아옴 ──
   const RS = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  const FONTS = [['round', '둥근'], ['gowun', '고운'], ['sans', '고딕']];
   function applyRead() {
-    const sans = RS.get('jcsReadFont', 'serif') === 'sans', size = Math.min(24, Math.max(15, +RS.get('jcsReadSize', '18')));
-    const h = document.documentElement; h.classList.toggle('read-sans', sans); h.classList.toggle('read-serif', !sans); h.style.setProperty('--rsize', size + 'px');
-    if (!document.getElementById('jcsReadFonts')) {
-      const a = document.createElement('link'); a.id = 'jcsReadFonts'; a.rel = 'stylesheet'; a.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&display=swap'; document.head.append(a);
+    let f = RS.get('jcsReadFont2', 'round'); if (!FONTS.some((x) => x[0] === f)) f = 'round';
+    const size = Math.min(24, Math.max(15, +RS.get('jcsReadSize', '18')));
+    const h = document.documentElement; for (const [k] of FONTS) h.classList.toggle('read-' + k, k === f); h.style.setProperty('--rsize', size + 'px');
+    if (!document.getElementById('jcsReadFonts')) {   // 둥근 글씨(나눔스퀘어라운드)는 프로그램에 들어 있음, 나머지는 처음 쓸 때 받아옴
+      const a = document.createElement('link'); a.id = 'jcsReadFonts'; a.rel = 'stylesheet'; a.href = 'https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap'; document.head.append(a);
       const b = document.createElement('link'); b.rel = 'stylesheet'; b.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css'; document.head.append(b);
     }
-    return { sans, size };
+    return { f, size };
   }
   function readCtl() {
     const w = el('div', 'rctl'); const st = applyRead();
-    const f = el('button', st.sans ? '' : 'on', st.sans ? '고딕' : '명조'); f.title = '글씨체 바꾸기 (명조 ↔ 고딕)';
-    f.onclick = (e) => { e.stopPropagation(); const s = RS.get('jcsReadFont', 'serif') === 'sans' ? 'serif' : 'sans'; RS.set('jcsReadFont', s); const r = applyRead(); f.textContent = r.sans ? '고딕' : '명조'; f.classList.toggle('on', !r.sans); };
+    const label = (k) => (FONTS.find((x) => x[0] === k) || FONTS[0])[1];
+    const f = el('button', 'on', label(st.f)); f.title = '글씨체 바꾸기 (둥근 → 고운 → 고딕)';
+    f.onclick = (e) => { e.stopPropagation(); const cur = applyRead().f; const nx = FONTS[(FONTS.findIndex((x) => x[0] === cur) + 1) % FONTS.length][0]; RS.set('jcsReadFont2', nx); f.textContent = label(applyRead().f); };
     const dn = el('button', null, 'A−'); dn.title = '글씨 작게'; dn.onclick = (e) => { e.stopPropagation(); RS.set('jcsReadSize', String(Math.max(15, applyRead().size - 1))); applyRead(); };
     const up = el('button', null, 'A+'); up.title = '글씨 크게'; up.onclick = (e) => { e.stopPropagation(); RS.set('jcsReadSize', String(Math.min(24, applyRead().size + 1))); applyRead(); };
     w.append(f, dn, up); return w;
@@ -326,7 +329,16 @@
   }
   // ── 기사 요약 보기 창 ──
   let reopening = false;
+  let curArticle = null;
+  // 용어 말풍선의 [🤖 AI 풀이]: 지금 보고 있는 기사 맥락으로 그 단어 뜻을 설명
+  window.jcsAskTerm = async (term) => {
+    if (!curArticle) throw new Error('기사를 연 상태에서만 쓸 수 있어요.');
+    if (!aiKey()) throw new Error('AI 키가 아직 없어요. 기사 아래 [AI에게 물어보기]에서 키를 먼저 넣어 주세요.');
+    try { return await askGemini(curArticle, [{ role: 'user', text: `이 기사에 나온 "${term}"이(가) 무슨 뜻인지, 이 기사에서는 어떤 의미로 쓰였는지 3~4문장으로 아주 쉽게 설명해줘. 번호나 목록 없이 이어지는 문장으로.` }]); }
+    catch (e) { throw new Error(e.message === 'PAY' ? '결제 잔액이 부족해요(AI Studio에서 충전).' : e.message === 'LIMIT' ? '사용 한도에 걸렸어요. 잠시 뒤 다시 눌러 주세요.' : e.message === 'BUSY' ? '구글 AI가 붐벼요. 잠시 뒤 다시 눌러 주세요.' : e.message === 'KEY' ? 'AI 키가 맞지 않아요.' : 'AI 연결에 실패했어요.'); }
+  };
   function openArticle(i) {
+    curArticle = i;
     const ov = el('div', 'nov'); const box = el('div', 'nbox');
     // 요약 창이 떠 있는 동안 뒤의 목록은 움직이지 않게 (손가락으로 밀어도 창 안만 스크롤)
     document.documentElement.classList.add('nlock');
