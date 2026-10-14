@@ -90,6 +90,26 @@
     li.append(el('div', 'ntime', hm(i.t)));
     return li;
   }
+  // ── 기사 읽기 글씨: 명조(기본)·고딕, 크기 조절. 글꼴은 처음 기사를 열 때만 받아옴 ──
+  const RS = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  function applyRead() {
+    const sans = RS.get('jcsReadFont', 'serif') === 'sans', size = Math.min(24, Math.max(15, +RS.get('jcsReadSize', '18')));
+    const h = document.documentElement; h.classList.toggle('read-sans', sans); h.classList.toggle('read-serif', !sans); h.style.setProperty('--rsize', size + 'px');
+    if (!document.getElementById('jcsReadFonts')) {
+      const a = document.createElement('link'); a.id = 'jcsReadFonts'; a.rel = 'stylesheet'; a.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&display=swap'; document.head.append(a);
+      const b = document.createElement('link'); b.rel = 'stylesheet'; b.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css'; document.head.append(b);
+    }
+    return { sans, size };
+  }
+  function readCtl() {
+    const w = el('div', 'rctl'); const st = applyRead();
+    const f = el('button', st.sans ? '' : 'on', st.sans ? '고딕' : '명조'); f.title = '글씨체 바꾸기 (명조 ↔ 고딕)';
+    f.onclick = (e) => { e.stopPropagation(); const s = RS.get('jcsReadFont', 'serif') === 'sans' ? 'serif' : 'sans'; RS.set('jcsReadFont', s); const r = applyRead(); f.textContent = r.sans ? '고딕' : '명조'; f.classList.toggle('on', !r.sans); };
+    const dn = el('button', null, 'A−'); dn.title = '글씨 작게'; dn.onclick = (e) => { e.stopPropagation(); RS.set('jcsReadSize', String(Math.max(15, applyRead().size - 1))); applyRead(); };
+    const up = el('button', null, 'A+'); up.title = '글씨 크게'; up.onclick = (e) => { e.stopPropagation(); RS.set('jcsReadSize', String(Math.min(24, applyRead().size + 1))); applyRead(); };
+    w.append(f, dn, up); return w;
+  }
+  applyRead();
   let lastData = null;
   const viewMode = () => { try { return localStorage.getItem('jcsNewsView') === 'sbs' ? 'sbs' : 'all'; } catch (e) { return 'all'; } };
   let shown = [];   // 지금 화면에 보이는 기사
@@ -333,7 +353,7 @@
       const t = e.changedTouches[0]; const dx = t.clientX - sx, dy = t.clientY - sy;
       if (Math.abs(dx) > 90 && Math.abs(dy) < 60 && Date.now() - st < 600 && !(window.getSelection() + '')) closeOv();
     }, { passive: true });
-    const top = el('div', 'ntop'); top.append(el('span', 'npaper', i.paper), el('span', 'ntime', hm(i.t)), close);
+    const top = el('div', 'ntop'); top.append(el('span', 'npaper', i.paper), el('span', 'ntime', hm(i.t)), readCtl(), close);
     const nh = el('h3', 'nh', cleanTitle(i.title));
     if (window.jcsMarkTerms) window.jcsMarkTerms(nh);   // 제목의 용어·한자도 누르면 설명
     if (window.jcsMarkHanja) window.jcsMarkHanja(nh);
