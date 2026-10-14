@@ -176,10 +176,22 @@
   .ntop { display:flex; align-items:center; gap:8px; }
   .ntop .ntime { flex:1; margin:0; }
   .nclose { font:inherit; font-size:14px; padding:6px 14px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); }
-  .nh { font-size:21px; line-height:1.4; margin:10px 0 12px; }
+
+  /* ── 기사 읽기: 책처럼 읽기 편한 글씨 (명조/고딕·크기는 기사 위 [가][A−][A+]로 바꿈) ── */
+  :root { --rfont:"Noto Serif KR","RIDIBatang","KoPubWorld Batang","Nanum Myeongjo","AppleMyungjo",serif; --rsize:18px; }
+  html.read-sans { --rfont:"Pretendard Variable","Pretendard","Noto Sans KR","Malgun Gothic",sans-serif; }
+  .nh { font-family:var(--rfont); font-weight:700; letter-spacing:-0.01em; font-size:calc(var(--rsize) + 4px); line-height:1.45; }
+  .nsum p { font-family:var(--rfont); font-size:var(--rsize); line-height:1.9; letter-spacing:-0.005em; margin:0 0 1.05em; text-align:left; }
+  html[data-theme="dark"] .nsum p { color:#dfe2e7; }
+  html[data-theme="dark"].read-serif .nsum p { font-weight:500; }   /* 다크 모드에서 명조 획이 너무 가늘어 보이지 않게 */
+  .aimsg.ai { font-family:var(--rfont); font-size:calc(var(--rsize) - 1.5px); line-height:1.8; }
+  .rctl { display:flex; gap:4px; }
+  .rctl button { font:inherit; font-size:13px; min-width:34px; padding:5px 8px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); cursor:pointer; }
+  .rctl button.on { border-color:var(--brand); color:var(--brand-d); }
+  .nh { margin:10px 0 12px; }
   .nimg { width:100%; max-height:420px; object-fit:cover; border-radius:10px; margin-bottom:12px; background:#eee; }
   .nlabel { font-weight:800; color:var(--brand-d); font-size:14px; margin-bottom:4px; }
-  .nsum p { font-size:16.5px; line-height:1.75; margin:0 0 12px; word-break:keep-all; }
+  .nsum p { word-break:keep-all; }
   .nsumtxt { font-size:16px; line-height:1.6; }
   .nsrc { display:inline-block; margin-top:14px; font-size:13px; color:var(--sub); }
   html.nlock, html.nlock body { overflow:hidden; overscroll-behavior:none; }
