@@ -58,8 +58,10 @@
     return null;
   }
   // GitHub가 받아둔 것(요약·사진 포함)을 먼저 쓰고, PC는 그게 오래됐을 때만 신문사에서 직접 받음
+  let lastShared = 0;
   async function loadAll() {
     const shared = await loadShared();
+    if (shared) lastShared = shared.at;
     if (!IS_EXT) return shared || { at: 0, items: [] };
     if (shared && Date.now() - shared.at < 45 * 60000) return shared;
     const lists = await Promise.all(PAPERS.map((p) => loadPaper(p).catch(() => [])));
@@ -97,7 +99,11 @@
     if (!box) return;
     box.textContent = '';
     const head = el('div', 'nhead');
-    head.append(el('h2', null, '📰 신문 요약'), el('span', 'nsub', loading ? '새 기사 받는 중…' : (data ? `불러온 시각 ${hm(data.at)}` : '')));
+    const ageMin = data && data.at ? Math.round((Date.now() - data.at) / 60000) : 0;
+    const sub = el('span', 'nsub', loading ? '새 기사 받는 중…' : (data ? `불러온 시각 ${hm(data.at)}` + (ageMin >= 60 ? ` · ${ageMin >= 120 ? Math.floor(ageMin / 60) + '시간' : ageMin + '분'} 전 자료` : '') + (kickState === 'run' ? ' · 새로 만드는 중(1~2분)…' : '') : ''));
+    if (ageMin >= 60 && !loading) sub.style.color = '#f59e0b';
+    head.append(el('h2', null, '📰 신문 요약'), sub);
+    if (kickState === 'perm') head.append(el('div', 'nsub', '⚠ 자동 갱신을 하려면 GitHub 키에 "Actions: 읽기/쓰기" 권한이 필요해요.'));
     // 보기 선택: 전체 / SBS만 (마지막 선택 기억)
     const seg = el('div', 'nseg');
     for (const [v, label] of [['all', '전체'], ['sbs', 'SBS만']]) {
@@ -392,6 +398,7 @@
           if (out && cand.finishReason === 'MAX_TOKENS') out += ' …(길어서 여기서 끊겼어요. "계속 설명해줘"라고 보내 보세요)';
           return out || '대답을 만들지 못했어요. 다시 물어봐 주세요.';
         }
+        if (r.status === 402) throw new Error('PAY');   // 결제 필요(잔액 부족·지출 한도·결제수단 문제)
         if (!r.ok && r.status !== 429 && r.status !== 404 && r.status < 500 && r.status !== 400 && r.status !== 403) lastErr = model + ' · HTTP ' + r.status;
         if (r.status === 400 || r.status === 403) {
           const j = await r.json().catch(() => ({})); if (/API key|API_KEY/i.test(JSON.stringify(j))) throw new Error('KEY');
@@ -484,7 +491,7 @@
         const m = add('model', a); wait.remove(); void m;
       } catch (e) {
         hist.pop(); wait.remove();
-        add('model', e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 AI를 쓰지 못했어요.' + (e.detail ? ' [원인: ' + e.detail + ']' : ' (원인을 알 수 없어요. 키를 다시 넣어 보세요)') : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? (e.kind === 'min' ? `1분당 사용 한도에 걸렸어요. ${e.sec ? e.sec + '초' : '1분'} 뒤에 다시 눌러 주세요.` : e.kind === 'day' ? '이 키의 오늘 무료 사용량(하루 한도)을 다 썼어요. 내일 다시 쓰거나 AI Studio에서 결제를 연결해야 해요.' : '무료 사용 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.') + ' (걸린 모델: ' + (e.models || []).join(', ') + ')' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
+        add('model', e.message === 'PAY' ? '구글이 "결제가 필요해요(402)"라고 해요. AI Studio의 [결제]·[지출] 메뉴에서 선불 잔액 충전, 지출 한도, 결제 카드 상태를 확인해 주세요.' : e.message === 'KEY' ? '키가 맞지 않아요. 아래 [키 다시 넣기]를 눌러 주세요.' : e.message === 'MODEL' ? '이 키로 AI를 쓰지 못했어요.' + (e.detail ? ' [원인: ' + e.detail + ']' : ' (원인을 알 수 없어요. 키를 다시 넣어 보세요)') : e.message === 'BUSY' ? '구글 AI가 지금 사람이 많아 붐벼요. 10~20초 뒤 다시 눌러 주세요.' : e.message === 'LIMIT' ? (e.kind === 'min' ? `1분당 사용 한도에 걸렸어요. ${e.sec ? e.sec + '초' : '1분'} 뒤에 다시 눌러 주세요.` : e.kind === 'day' ? '이 키의 오늘 무료 사용량(하루 한도)을 다 썼어요. 내일 다시 쓰거나 AI Studio에서 결제를 연결해야 해요.' : '무료 사용 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.') + ' (걸린 모델: ' + (e.models || []).join(', ') + ')' : '연결에 실패했어요(' + e.message + '). 인터넷을 확인하고 다시 해 주세요.');
       } finally { busy = false; }
     }
     go.onclick = () => send(inp.value);
@@ -504,11 +511,29 @@
       const data = await loadAll();
       if (data.items.length) await cacheSet(data);
       draw(data.items.length ? data : cached, false);
+      kickBuild(shownAt(data, cached)).catch(() => {});
     } finally { busy = false; }
+  }
+  // GitHub의 자동 실행(예약)은 자주 건너뛰어서 몇 시간씩 밀림 → 이 프로그램이 켜져 있을 때 직접 "지금 만들어"라고 요청
+  let kickState = '';
+  const shownAt = (d, c) => (IS_EXT ? (lastShared || 0) : ((d && d.items.length ? d : c) || {}).at || 0);
+  async function kickBuild(at) {
+    if (typeof getGhToken !== 'function') return;
+    if (at && Date.now() - at < 25 * 60000) return;            // 25분 안에 만든 거면 충분
+    if (new Date().getHours() < 5) return;                      // 새벽 0~5시는 쉼
+    let last = 0; try { last = +localStorage.getItem('jcsNewsKick') || 0; } catch (e) {}
+    if (Date.now() - last < 12 * 60000) return;                 // 너무 자주 요청하지 않게
+    const tok = await getGhToken().catch(() => ''); if (!tok) return;
+    try { localStorage.setItem('jcsNewsKick', String(Date.now())); } catch (e) {}
+    const r = await fetch('https://api.github.com/repos/rokaf072/jcs/actions/workflows/news.yml/dispatches', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json' }, body: JSON.stringify({ ref: 'main' }) }).catch(() => null);
+    if (!r) return;
+    if (r.status === 204) { kickState = 'run'; if (lastData) draw(lastData, false); for (const ms of [100000, 160000, 240000]) setTimeout(() => refresh(true).then(() => { if (lastData && Date.now() - lastData.at < 10 * 60000) kickState = ''; }), ms); }
+    else if (r.status === 403 || r.status === 404) { kickState = 'perm'; if (lastData) draw(lastData, false); }
   }
   window.newsRefresh = refresh;
   refresh(false);
-  setInterval(() => refresh(false), 15 * 60000);   // 켜두면 15분마다 갱신
+  setInterval(() => refresh(false), 15 * 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(false); });   // 폰에서 앱으로 돌아오면 바로 확인   // 켜두면 15분마다 갱신
   const go = document.getElementById('newsBtn');
   if (go) go.onclick = () => document.getElementById('news').scrollIntoView({ behavior: 'smooth' });
 })();
