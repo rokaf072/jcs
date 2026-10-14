@@ -320,8 +320,8 @@ function waitingMessage(date) {
   const dow = new Date(date + 'T00:00:00').getDay();
   if (dow === 0 || dow === 6) return { head: '오늘은 주말이에요', text: '김태현의 정치쇼는 월~금 방송이라 오늘은 출연자 글이 없어요.', auto: false };
   const n = new Date(), hm = n.getHours() * 60 + n.getMinutes();
-  if (hm < 6 * 60 + 20) return { head: '아직 작가가 오늘 출연자를 올리지 않았어요', text: '이 화면을 열어두면 자동으로 확인해서, 올라오는 즉시 보여드릴게요.', auto: true };
-  if (hm < 7 * 60 + 5) return { head: '아직 작가가 오늘 출연자를 올리지 않았어요', text: '평소보다 조금 늦어지고 있어요. 방송 시작(07:05) 전까지 자동으로 계속 확인할게요.', auto: true };
+  if (hm < 6 * 60 + 20) return { head: '아직 작가님이 오늘 출연자를 올리지 않았어요', text: '이 화면을 열어두면 자동으로 확인해서, 올라오는 즉시 보여드릴게요.', auto: true };
+  if (hm < 7 * 60 + 5) return { head: '아직 작가님이 오늘 출연자를 올리지 않았어요', text: '평소보다 조금 늦어지고 있어요. 방송 시작(07:05) 전까지 자동으로 계속 확인할게요.', auto: true };
   if (hm < 9 * 60) return { head: '방송이 시작됐는데 아직 출연자 글이 없어요', text: '작가가 많이 늦어지고 있어요. 자동 확인은 계속하고 있고, 급하면 [원문]으로 게시판을 직접 확인해 보세요.', auto: true };
   return { head: '오늘 출연자 글이 올라오지 않았어요', text: '방송 시간(07:05~09:00)은 지났어요. 결방이나 특집 편성일 수 있어요.', auto: true };
 }
