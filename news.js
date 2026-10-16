@@ -17,6 +17,9 @@
   const RE_ECO = /경제|금리|환율|증시|코스피|코스닥|주가|주식|물가|부동산|집값|아파트|수출|무역|관세|반도체|기업|실적|성장률|한은|한국은행|기준금리|투자|채권|원·달러|유가|가계부채|대출|세수|예산|고용|일자리/;
   const MAX_AGE = 36 * 3600000;
 
+  // 신문사의 일본어·중국어·영어판 기사는 빼기 (예: 조선일보 /jp/ 일본어판)
+  const isForeign = (x) => /\/(jp|cn|en|english|japanese|chinese)(\/|-)|-(jp|cn|en)\//i.test(x.link.replace(/^https?:\/\/[^/]+/, '')) || /^https?:\/\/(japanese|english|cn|chinese|jp|en)\./i.test(x.link)
+    || /[\u3040-\u30ff]/.test(x.title) || (!/[가-힣]/.test(x.title) && /[\u4e00-\u9fff]{4,}/.test(x.title)) || (!/[가-힣]/.test(x.title + (x.desc || '')) && /^[\x00-\x7f\s'"’“”‘—–-]{25,}$/.test(x.title));
   const strip = (h) => { const d = document.createElement('div'); d.innerHTML = h || ''; return (d.textContent || '').replace(/\s+/g, ' ').trim(); };
   function parseRSS(xml, paper, src) {
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
@@ -27,7 +30,7 @@
       if (desc.startsWith(title.slice(0, 20))) desc = '';
       const t = Date.parse(g('pubDate')) || 0;
       return { paper, title, link: g('link').trim(), desc: desc.slice(0, 140), t };
-    }).filter((x) => x.title && x.link && (!x.t || Date.now() - x.t < MAX_AGE));
+    }).filter((x) => x.title && x.link && !isForeign(x) && (!x.t || Date.now() - x.t < MAX_AGE));
   }
   async function getText(url, ms = 6000) {
     const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), ms);
@@ -127,9 +130,9 @@
     if (ageMin >= 60 && !loading) sub.style.color = '#f59e0b';
     head.append(el('h2', null, '📰 신문 요약'), sub);
     if (kickState === 'perm') head.append(el('div', 'nsub', '⚠ 자동 갱신을 하려면 GitHub 키에 "Actions: 읽기/쓰기" 권한이 필요해요.'));
-    // 보기 선택: 전체 / SBS만 (마지막 선택 기억)
+    // 보기 선택: 전체 / SBS 기사모음 (마지막 선택 기억)
     const seg = el('div', 'nseg');
-    for (const [v, label] of [['all', '전체'], ['sbs', 'SBS만']]) {
+    for (const [v, label] of [['all', '전체'], ['sbs', 'SBS 기사모음']]) {
       const b = el('button', 'nsegb' + (v === 'sbs' ? ' sbs' : '') + (viewMode() === v ? ' on' : ''), label);
       b.onclick = () => { try { localStorage.setItem('jcsNewsView', v); } catch (e) {} draw(lastData, false); };
       seg.append(b);
