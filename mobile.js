@@ -58,6 +58,7 @@ async function fetchPost(p) {
 let faceReady = null;
 function loadFace() {
   if (!faceReady) faceReady = (async () => {
+    if (typeof faceapi === 'undefined') await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'lib/face-api.js'; s.onload = ok; s.onerror = no; document.head.append(s); });   // 얼굴 인식 도구(1.3MB)는 필요할 때만 불러옴 → 처음 실행이 빨라짐
     try { await faceapi.tf.setBackend('webgl'); } catch (e) { await faceapi.tf.setBackend('cpu'); }
     await faceapi.tf.ready();
     await Promise.all([
@@ -288,7 +289,7 @@ function render(post) {
         const info = el('div');
         info.append(el('div', 'gname', g.name), el('div', 'grole', g.role));
         const tools = el('div', 'gtools'), b = el('button', 'latest', '사진 고르기');
-        b.onclick = () => openPicker(g, ph); ph.onclick = () => openPicker(g, ph);
+        b.onclick = () => openPicker(g, ph);   // 사진을 누르면 크게 보기 (zoom.js)
         const a = el('a', null, '검색'); a.href = 'https://m.search.naver.com/search.naver?query=' + encodeURIComponent(`${g.name} ${g.role}`); a.target = '_blank';
         const del = el('button', 'del', '사진 지우기');
         del.onclick = () => {
@@ -296,7 +297,7 @@ function render(post) {
           store.del('manual:' + g.name); store.set('none:' + g.name, Date.now()); setPhoto(ph, {}, g.name);
           schedulePush();
         };
-        if (isOwner()) tools.append(b, del, a); else { ph.onclick = null; tools.append(a); }   // 직원 폰: [검색]만
+        if (isOwner()) tools.append(b, del, a); else { tools.append(a); }   // 직원 폰: [검색]만
         info.append(tools);
         card.append(ph, info); grid.append(card);
         getPhoto({ ...g, topic: c.topic }, (r) => setPhoto(ph, r, g.name)).then((r) => setPhoto(ph, r, g.name));
@@ -340,7 +341,7 @@ function renderWaiting(date, note) {
   clearTimeout(waitTimer);
   if (m.auto && date === todayStr()) { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); waitTimer = setTimeout(() => init(true), hm >= 360 && hm < 425 ? 30000 : 3 * 60000); }
 }
-async function show(date, force = false) {
+async function show(date, force = false, skipKey = '') {
   clearTimeout(waitTimer);
   try {
     const p = posts.find((x) => x.date === date);
@@ -349,6 +350,7 @@ async function show(date, force = false) {
     if (force || !post || (p.updated && post.updated !== p.updated)) post = await fetchPost(p);
     fillSelect(date);
     if (!post.parts.length && date === todayStr()) return renderWaiting(date, '오늘 글은 올라왔는데 출연자 명단이 아직 비어 있어요. 작가가 작성 중일 수 있어요. 자동으로 다시 확인할게요.');
+    if (skipKey && skipKey === date + '|' + (post.updated || '')) return true;   // 이미 저장본으로 그려 둔 것과 같음
     render(post);
   } catch (e) { status(e.message, true); }
 }
@@ -379,7 +381,13 @@ async function init(force = false) {
     const keepY = force ? window.scrollY : (saved && saved.y) || 0;
     const keepPost = keep && (posts.find((p) => p.date === keep) || (saved && saved.date === keep && saved.post));
     posts = store.get('posts') || [];
-    await Promise.all([
+    // 빠른 시작: 저장해 둔 내용을 먼저 바로 보여주고, 인터넷 확인은 그 뒤에
+    let quick = '';
+    if (!force) {
+      const tgt = keep || todayStr(), qp = store.get('post:' + tgt);
+      if (qp && qp.parts && qp.parts.length && posts.some((p) => p.date === tgt)) { fillSelect(tgt); render(qp); restoreScroll(keepY); quick = tgt + '|' + (qp.updated || ''); }
+    }
+    const [, pulled] = await Promise.all([
       fetchList().catch((e) => { if (!posts.length) throw e; status('인터넷 연결을 확인하세요. 저장된 내용을 보여드려요.', true); }),
       Promise.race([syncPull(true), new Promise((r) => setTimeout(r, 4000))]),   // PC에서 고른 사진 받아오기
     ]);
@@ -387,8 +395,8 @@ async function init(force = false) {
     if (keepPost && !posts.some((p) => p.date === keep)) { posts.push(keepPost); posts.sort((a, b) => b.date.localeCompare(a.date)); }
     const target = keep || todayStr();
     fillSelect(target);
-    await show(target, force);   // [새로고침]이면 그 날짜 내용도 새로 받아옴
-    restoreScroll(keepY);
+    const same = await show(target, force, pulled ? '' : quick);   // [새로고침]이면 그 날짜 내용도 새로 받아옴
+    if (!same && !quick) restoreScroll(keepY);
     saveView();
   } catch (e) { status(e.message, true); }
 }
@@ -819,4 +827,4 @@ setTimeout(() => ensureIndex(), 10000);
 init();
 startLiveSync();
 handleShared();
-setTimeout(() => loadFace(), 0);
+setTimeout(() => { if (isOwner()) loadFace(); }, 3000);   // 얼굴 인식은 관리자 폰에서만, 화면이 다 뜬 뒤에

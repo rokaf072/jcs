@@ -250,6 +250,17 @@
   .gtools a, .gtools button { font:inherit; font-size:12.5px; padding:4px 10px; border-radius:999px; border:1px solid rgba(159,227,212,.45); background:transparent; color:#9fe3d4; text-decoration:none; cursor:pointer; }
   .gtools button { border-color:rgba(167,139,250,.6); color:#c4b5fd; }
   .gtools button:disabled { opacity:.5; }
+  /* 출연자 사진 크게 보기 */
+  #main .guest .photo { cursor:zoom-in; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  .zoomov { position:fixed; inset:0; z-index:120; background:rgba(5,8,12,.86); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; cursor:zoom-out; -webkit-touch-callout:none; }
+  .zoomov.on { opacity:1; }
+  .zoomfig { margin:0; display:flex; flex-direction:column; align-items:center; gap:12px; transform:scale(.94); transition:transform .15s; }
+  .zoomov.on .zoomfig { transform:scale(1); }
+  .zoomimg { max-width:90vw; max-height:76vh; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.6); object-fit:contain; background:#111; }
+  .zoomcrop { border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  .zoomcap { text-align:center; color:#e7eaf0; }
+  .zoomcap b { display:block; font-size:24px; }
+  .zoomcap span { font-size:15px; color:#98a2b3; }
 </style>
 </head>
 <body>
@@ -272,11 +283,11 @@
 <main id="main"></main>
 <section id="news" class="news"></section>
 <script src="canvas-fix.js"></script>
-<script src="lib/face-api.js"></script>
 <script src="parser.js"></script>
 <script src="mobile.js"></script>
 <script src="glossary.js"></script>
 <script src="hanja.js"></script>
+<script src="zoom.js"></script>
 <script src="news.js"></script>
 <script src="onair.js"></script>
 </body>
