@@ -18,6 +18,9 @@ const MAX_AGE = 36 * 3600000;
 const SUFFIX = /\s+-\s+(조선비즈|조선일보|스포츠조선|중앙일보|중앙SUNDAY|한국경제|한경닷컴|한경|미디어오늘)\s*$/;
 
 const ent = (s) => (s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&middot;/g, '·').replace(/&hellip;/g, '…').replace(/&lsquo;|&rsquo;/g, "'").replace(/&ldquo;|&rdquo;/g, '"').replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))).replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&amp;/g, '&');
+// 신문사의 일본어·중국어·영어판 기사는 빼기 (예: 조선일보 /jp/ 일본어판)
+const isForeign = (x) => /\/(jp|cn|en|english|japanese|chinese)(\/|-)|-(jp|cn|en)\//i.test(x.link.replace(/^https?:\/\/[^/]+/, '')) || /^https?:\/\/(japanese|english|cn|chinese|jp|en)\./i.test(x.link)
+  || /[\u3040-\u30ff]/.test(x.title) || (!/[가-힣]/.test(x.title) && /[\u4e00-\u9fff]{4,}/.test(x.title)) || (!/[가-힣]/.test(x.title + (x.desc || '')) && /^[\x00-\x7f\s'"’“”‘—–-]{25,}$/.test(x.title));
 const strip = (h) => ent(ent(h || '')).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const tag = (x, t) => { const m = x.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)); return m ? m[1] : ''; };
 const keyOf = (t) => t.replace(SUFFIX, '').replace(/\s|[^\w가-힣]/g, '').slice(0, 30);
@@ -30,7 +33,7 @@ function parseRSS(xml, paper, src) {
     if (desc.startsWith(title.slice(0, 20))) desc = '';
     const t = Date.parse(strip(tag(it, 'pubDate'))) || 0;
     return { paper, title, link: strip(tag(it, 'link')), desc: desc.slice(0, 140), t };
-  }).filter((x) => x.title && x.link && (!x.t || Date.now() - x.t < MAX_AGE));
+  }).filter((x) => x.title && x.link && !isForeign(x) && (!x.t || Date.now() - x.t < MAX_AGE));
 }
 async function getText(url, opt = {}) {
   try {
