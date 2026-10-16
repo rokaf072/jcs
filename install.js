@@ -44,7 +44,16 @@
     paint();
   }
   function guide() {   // 설치 버튼이 안 되는 경우 (아이폰, 이미 설치됨, 삼성 인터넷 일부 등)
-    if (isIOS) note.innerHTML = '아이폰은 이렇게 설치해요<br><b>① 아래쪽 공유 버튼 <span class="instkey">□↑</span></b><br><b>② "홈 화면에 추가"</b> → <b>추가</b>';
+    if (isIOS) {
+      const crios = /CriOS/i.test(ua);
+      note.innerHTML = `<div class="iostitle">아이폰은 3단계로 설치해요</div>
+        <ol class="iossteps">
+          <li><span class="iosnum">1</span><div>${crios ? '주소창 오른쪽 <b>공유 버튼</b> <span class="instkey">□↑</span>을 눌러요' : '화면 맨 아래 <b>공유 버튼</b> <span class="instkey">□↑</span>을 눌러요<br><span class="instsmall">안 보이면 아래쪽 <b>···</b> 버튼 → <b>공유</b></span>'}</div></li>
+          <li><span class="iosnum">2</span><div>목록을 위로 올려 <b>"홈 화면에 추가"</b> <span class="instkey">⊞</span>를 눌러요<br><span class="instsmall">안 보이면 맨 아래 <b>"작업 편집"</b>·<b>"더 보기"</b></span></div></li>
+          <li><span class="iosnum">3</span><div>오른쪽 위 <b>"추가"</b>를 누르면 끝!<br><span class="instsmall">홈 화면의 <b>정치쇼</b> 아이콘으로 열어 주세요</span></div></li>
+        </ol>`;
+      if (!crios && !document.querySelector('.iosarrow')) { const a = document.createElement('div'); a.className = 'iosarrow'; a.textContent = '⬇'; sheet && sheet.append(a); }
+    }
     else note.innerHTML = '설치 창이 안 뜨면<br>오른쪽 위 <b>⋮</b> → <b>"앱 설치"</b>를 눌러 주세요.<br><span class="instsmall">이미 설치했다면 홈 화면의 <b>정치쇼</b> 아이콘으로 열어 주세요.</span>';
   }
   function paint() {
