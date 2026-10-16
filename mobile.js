@@ -552,20 +552,23 @@ function schedulePush() {
     syncPush().then((n) => { if (n) status(`사진을 다른 기기와 연동했어요.`); }).catch((e) => status(e.message, true));
   }, 3000);
 }
+// 숨은 관리자 로그인 (직원 화면에는 안 보임): 맨 위 제목을 빠르게 5번 누르기
+async function adminLogin() {
+  const t = prompt('관리자 키(GitHub 키)를 붙여넣으세요.'); if (!t) return;
+  const tok = t.replace(/\s+/g, '');
+  const r = await fetch('https://api.github.com/repos/rokaf072/jcs', { headers: { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json' } }).catch(() => null);
+  const j = r && r.ok ? await r.json().catch(() => ({})) : {};
+  if (!(j.permissions && j.permissions.push)) { alert('관리자 키가 아니에요.'); return; }
+  store.set('ghToken', tok); alert('관리자로 전환됐어요.'); location.reload();
+}
+{ let n = 0, t = 0; const h = document.querySelector('header h1');
+  if (h) h.addEventListener('click', () => { if (isOwner()) return; const now = Date.now(); n = now - t < 600 ? n + 1 : 1; t = now; if (n >= 5) { n = 0; adminLogin(); } }); }
 function openSettings() {
   const ov = el('div', 'overlay'), box = el('div', 'picker');
   box.append(el('div', 'ptitle', '설정'));
   const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); };
   if (!isOwner()) {   // 직원 폰: 사진 새로 받기 + 관리자 로그인만
     row('사진 새로 받기', '관리자가 고른 최신 사진을 바로 가져와요', async () => { const got = await syncPull(true); if (got && current) render(current); alert(got ? `새 사진 ${got}건을 받아왔어요.` : '이미 최신이에요.'); });
-    row('관리자 로그인', '관리자만 사진을 바꿀 수 있어요', async () => {
-      const t = prompt('관리자 키(GitHub 키)를 붙여넣으세요.'); if (!t) return;
-      const tok = t.replace(/\s+/g, '');
-      const r = await fetch('https://api.github.com/repos/rokaf072/jcs', { headers: { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json' } }).catch(() => null);
-      const j = r && r.ok ? await r.json().catch(() => ({})) : {};
-      if (!(j.permissions && j.permissions.push)) { alert('관리자 키가 아니에요.'); return; }
-      store.set('ghToken', tok); alert('관리자로 전환됐어요.'); location.reload();
-    });
     const close0 = el('button', 'pclose', '닫기'); close0.onclick = () => ov.remove();
     box.append(close0); ov.append(box); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
     document.body.append(ov); return;
