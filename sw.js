@@ -1,6 +1,6 @@
 // 앱 파일(화면·얼굴 인식 데이터)만 휴대폰에 저장해서 빠르게 열기. 출연자 정보는 항상 새로 받음.
-const CACHE = 'jcs-guest-v65';
-const FILES = ['./', 'index.html', 'canvas-fix.js', 'mobile.js', 'theme.js', 'news.js', 'zoom.js', 'onair.js', 'glossary.js', 'hanja.js', 'parser.js', 'manifest.webmanifest', 'lib/face-api.js', 'fonts/NanumSquareRoundR.woff2', 'fonts/NanumSquareRoundB.woff2',
+const CACHE = 'jcs-guest-v66';
+const FILES = ['./', 'index.html', 'canvas-fix.js', 'mobile.js', 'gate.js', 'theme.js', 'news.js', 'zoom.js', 'onair.js', 'glossary.js', 'hanja.js', 'parser.js', 'manifest.webmanifest', 'lib/face-api.js', 'fonts/NanumSquareRoundR.woff2', 'fonts/NanumSquareRoundB.woff2',
   'icons/icon192.png', 'icons/icon512.png',
   'lib/model/tiny_face_detector_model-weights_manifest.json', 'lib/model/tiny_face_detector_model.bin',
   'lib/model/face_landmark_68_tiny_model-weights_manifest.json', 'lib/model/face_landmark_68_tiny_model.bin',

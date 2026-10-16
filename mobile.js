@@ -373,6 +373,7 @@ function restoreScroll(y) {
   setTimeout(() => window.scrollTo(0, y), 1200);
 }
 async function init(force = false) {
+  if (window.jcsIsMember && !window.jcsIsMember()) return;   // 가입 전에는 아무것도 안 함
   try {
     // 새로고침: 보고 있던 날짜를 그대로 유지 (처음 열 때만 오늘)
     // [새로고침] 버튼이면 지금 화면, 브라우저 새로고침(F5·당겨서)이면 직전에 보던 화면을 유지
@@ -569,6 +570,10 @@ function openSettings() {
     box.append(close0); ov.append(box); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
     document.body.append(ov); return;
   }
+  row('👥 가입 기간·코드', '새 폰이 가입할 수 있는 기간과 코드 정하기', async () => {
+    try { const r = await jcsEditAccess(store.get('ghToken')); if (r) alert(`저장했어요.\n가입 기간: ${r.from} ~ ${r.until}\n(새 폰에 적용되기까지 1~10분 걸려요)`); }
+    catch (e) { alert(e.message); }
+  });
   row('카카오 키 입력', kakaoKey() ? '입력됨 · 바꾸려면 누르세요' : '사진 검색에 필요해요', askKey);
   row('PC 사진 지금 받아오기', 'PC에서 고른 사진을 바로 가져와요 (앱을 열 때도 자동)', async () => {
     status('PC 사진 확인 중…');
@@ -824,7 +829,7 @@ async function handleShared() {
 })();
 $('#search').onclick = openSearch;
 setTimeout(() => ensureIndex(), 10000);
-init();
+jcsGate({ isOwner: async () => isOwner(), hadData: async () => !!store.get('posts') }).then(() => init());
 startLiveSync();
 handleShared();
 setTimeout(() => { if (isOwner()) loadFace(); }, 3000);   // 얼굴 인식은 관리자 폰에서만, 화면이 다 뜬 뒤에

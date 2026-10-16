@@ -261,6 +261,21 @@
   .zoomcap { text-align:center; color:#e7eaf0; }
   .zoomcap b { display:block; font-size:24px; }
   .zoomcap span { font-size:15px; color:#98a2b3; }
+  /* 가입 코드 화면 */
+  html.gated body { overflow:hidden; }
+  .gateov { position:fixed; inset:0; z-index:200; background:#111419; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .gatebox { width:min(360px,100%); background:#1a1e25; border:1px solid #2a313c; border-radius:18px; padding:28px 22px; text-align:center; color:#e7eaf0; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .gatebox h2 { margin:6px 0 10px; font-size:20px; color:#6ee7cc; }
+  .gatelogo { font-size:40px; }
+  .gatemsg { font-size:15px; line-height:1.6; color:#c9ced6; margin:0 0 16px; }
+  .gatesub { font-size:13px; color:#98a2b3; }
+  .gateinp { width:100%; box-sizing:border-box; font:inherit; font-size:24px; letter-spacing:.3em; text-align:center; padding:12px; border-radius:12px; border:1px solid #2a313c; background:#111419; color:#e7eaf0; }
+  .gateinp:focus { outline:none; border-color:#4fd1b5; }
+  .gateinp::placeholder { letter-spacing:0; font-size:17px; color:#6b7480; }
+  .gatebtn { width:100%; margin-top:12px; font:inherit; font-size:17px; font-weight:800; padding:12px; border:0; border-radius:12px; background:#4fd1b5; color:#0b1f1b; cursor:pointer; }
+  .gateerr { min-height:20px; margin-top:10px; color:#fb7185; font-size:14px; }
+  .shake { animation:jcsShake .35s; }
+  @keyframes jcsShake { 20%,60% { transform:translateX(-8px); } 40%,80% { transform:translateX(8px); } }
 </style>
 </head>
 <body>
@@ -284,6 +299,7 @@
 <section id="news" class="news"></section>
 <script src="canvas-fix.js"></script>
 <script src="parser.js"></script>
+<script src="gate.js"></script>
 <script src="mobile.js"></script>
 <script src="glossary.js"></script>
 <script src="hanja.js"></script>
