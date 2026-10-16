@@ -9,6 +9,7 @@
 <link rel="icon" href="icons/icon192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script src="theme.js"></script>
+<script src="install.js"></script>
 <style>
   :root { --ink:#1b2a27; --sub:#5b6b67; --line:#d9e3e0; --bg:#eef2f1; --card:#fafbfb; --soft:#e6eeec; --brand:#3a9a8a; --brand-d:#2a7466; --sbs:#e11d48; color-scheme:light; }
   /* 다크 모드 (기본) — PC와 같은 남회색 + 민트 */
@@ -276,6 +277,18 @@
   .gateerr { min-height:20px; margin-top:10px; color:#fb7185; font-size:14px; }
   .shake { animation:jcsShake .35s; }
   @keyframes jcsShake { 20%,60% { transform:translateX(-8px); } 40%,80% { transform:translateX(8px); } }
+  /* 원클릭 설치 화면 */
+  .instov { position:fixed; inset:0; z-index:300; background:#111419; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .instbox { width:min(360px,100%); text-align:center; color:#e7eaf0; }
+  .insticon { width:96px; height:96px; border-radius:22px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .instbox h2 { margin:16px 0 6px; font-size:22px; color:#6ee7cc; }
+  .instsub { margin:0 0 26px; color:#98a2b3; font-size:15px; }
+  .instbtn { width:100%; font:inherit; font-size:20px; font-weight:800; padding:16px; border:0; border-radius:16px; background:#4fd1b5; color:#0b1f1b; cursor:pointer; box-shadow:0 8px 24px rgba(79,209,181,.3); }
+  .instbtn:disabled { opacity:.7; }
+  .instnote { min-height:24px; margin-top:16px; font-size:15px; line-height:1.7; color:#c9ced6; }
+  .instkey { display:inline-block; padding:0 6px; border:1px solid #4fd1b5; border-radius:6px; color:#6ee7cc; }
+  .instsmall { font-size:13px; color:#98a2b3; }
+  .instskip { margin-top:22px; font:inherit; font-size:14px; background:none; border:0; color:#6b7480; text-decoration:underline; cursor:pointer; }
 </style>
 </head>
 <body>
