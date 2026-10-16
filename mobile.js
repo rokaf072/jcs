@@ -157,6 +157,8 @@ async function getPhoto(g, onUpdate) {
   if (cached && cached.url) { job.then((r) => onUpdate && r.url !== cached.url && onUpdate(r)); return cached; }
   return job;
 }
+// ── 관리자(우진 님 폰)만 사진을 바꿀 수 있음: GitHub 키가 들어 있는 기기 = 관리자. 직원 폰은 보기 전용 ──
+const isOwner = () => !!store.get('ghToken');
 function setPhoto(box, info, name) {
   info = info || {};
   box.textContent = '';
@@ -175,11 +177,12 @@ function setPhoto(box, info, name) {
     img.onerror = () => { if (info.alt && img.src !== info.alt) img.src = info.alt; else setPhoto(box, {}, name); };
     box.append(img);
   } else {
-    box.append(el('div', null, name.slice(-2)), el('div', 'need', kakaoKey() ? '탭해서 사진 확인' : '⚙에서 키 입력'));
+    box.append(el('div', null, name.slice(-2)), el('div', 'need', !isOwner() ? '사진 준비 중' : kakaoKey() ? '탭해서 사진 확인' : '⚙에서 키 입력'));
   }
   if (info.url && info.temp) box.append(el('span', 'tempbadge', '임시'));
 }
 function openPicker(g, ph) {
+  if (!isOwner()) return;   // 보기 전용
   if (!kakaoKey()) { askKey(); return; }
   const ov = el('div', 'overlay'), box = el('div', 'picker');
   box.append(el('div', 'ptitle', `${g.name} 사진 고르기`), el('div', 'psub', `다음 이미지 · "${g.name} ${g.role}" · 탭하면 고정`));
@@ -293,7 +296,8 @@ function render(post) {
           store.del('manual:' + g.name); store.set('none:' + g.name, Date.now()); setPhoto(ph, {}, g.name);
           schedulePush();
         };
-        tools.append(b, del, a); info.append(tools);
+        if (isOwner()) tools.append(b, del, a); else { ph.onclick = null; tools.append(a); }   // 직원 폰: [검색]만
+        info.append(tools);
         card.append(ph, info); grid.append(card);
         getPhoto({ ...g, topic: c.topic }, (r) => setPhoto(ph, r, g.name)).then((r) => setPhoto(ph, r, g.name));
       }
@@ -543,6 +547,20 @@ function openSettings() {
   const ov = el('div', 'overlay'), box = el('div', 'picker');
   box.append(el('div', 'ptitle', '설정'));
   const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); };
+  if (!isOwner()) {   // 직원 폰: 사진 새로 받기 + 관리자 로그인만
+    row('사진 새로 받기', '관리자가 고른 최신 사진을 바로 가져와요', async () => { const got = await syncPull(true); if (got && current) render(current); alert(got ? `새 사진 ${got}건을 받아왔어요.` : '이미 최신이에요.'); });
+    row('관리자 로그인', '관리자만 사진을 바꿀 수 있어요', async () => {
+      const t = prompt('관리자 키(GitHub 키)를 붙여넣으세요.'); if (!t) return;
+      const tok = t.replace(/\s+/g, '');
+      const r = await fetch('https://api.github.com/repos/rokaf072/jcs', { headers: { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json' } }).catch(() => null);
+      const j = r && r.ok ? await r.json().catch(() => ({})) : {};
+      if (!(j.permissions && j.permissions.push)) { alert('관리자 키가 아니에요.'); return; }
+      store.set('ghToken', tok); alert('관리자로 전환됐어요.'); location.reload();
+    });
+    const close0 = el('button', 'pclose', '닫기'); close0.onclick = () => ov.remove();
+    box.append(close0); ov.append(box); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.append(ov); return;
+  }
   row('카카오 키 입력', kakaoKey() ? '입력됨 · 바꾸려면 누르세요' : '사진 검색에 필요해요', askKey);
   row('PC 사진 지금 받아오기', 'PC에서 고른 사진을 바로 가져와요 (앱을 열 때도 자동)', async () => {
     status('PC 사진 확인 중…');
@@ -736,6 +754,7 @@ function chooseGuest() {
 }
 async function handleShared() {
   if (!/[?&]shared=1/.test(location.search)) return;
+  if (!isOwner()) { try { history.replaceState(null, '', location.pathname); } catch (e) {} return; }
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
   let url = '', shared = '';
   try {
