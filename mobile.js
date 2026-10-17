@@ -724,7 +724,7 @@ async function openSearch() {
     for (const it of found.slice(0, 30)) {
       const card = el('div', 'scard');
       const ph = el('div', 'sphoto', it.name.slice(-2));
-      knownPhoto(it.name, it.role).then((u) => { if (u) { ph.textContent = ''; const im = document.createElement('img'); im.referrerPolicy = 'no-referrer'; im.src = u; im.onerror = () => { ph.textContent = it.name.slice(-2); }; ph.append(im); } });
+      knownPhoto(it.name, it.role).then((r) => drawThumb(ph, r, it.name));
       const info = el('div', 'sinfo');
       info.append(el('div', 'sname', it.name), el('div', 'srole', it.role), el('div', 'scount', `출연 ${it.hits.length}회 · 최근 ${fullDate(it.hits[0].date)}`));
       const list = el('div', 'shits');
@@ -744,9 +744,23 @@ async function openSearch() {
   ensureIndex(() => { if (document.body.contains(ov)) draw(true); });
 }
 
-async function knownPhoto(name, role) {
-  const m = store.get('manual:' + name); if (m && m.url) return m.url;
-  const a = store.get('auto:' + name + '|' + role); return (a && a.url) || '';
+// 검색 목록 작은 사진: 출연자 카드와 똑같이 얼굴 부분만 보이게 (영상 장면 사진은 잘라 둔 위치 사용)
+function drawThumb(ph, rec, name) {
+  if (!rec || !rec.url) return;
+  ph.textContent = '';
+  if (rec.crop) {
+    const c = rec.crop, d = document.createElement('div'); d.className = 'cropimg';
+    d.style.backgroundImage = `url("${rec.url}")`; d.style.backgroundSize = `${100 / c.w}% ${100 / c.h}%`;
+    d.style.backgroundPosition = `${c.w < 1 ? (c.x / (1 - c.w)) * 100 : 0}% ${c.h < 1 ? (c.y / (1 - c.h)) * 100 : 0}%`;
+    ph.append(d); return;
+  }
+  const im = document.createElement('img'); im.referrerPolicy = 'no-referrer'; im.src = rec.url;
+  if (rec.cy != null) im.style.objectPosition = `${Math.round((rec.cx ?? 0.5) * 100)}% ${Math.round(Math.min(rec.cy, 0.6) * 100)}%`;
+  im.onerror = () => { ph.textContent = name.slice(-2); }; ph.append(im);
+}
+async function knownPhoto(name, role) {   // → { url, crop, cx, cy }
+  const m = store.get('manual:' + name); if (m && m.url) return m;
+  const a = store.get('auto:' + name + '|' + role); return a && a.url ? a : null;
 }
 // ───────── 다른 앱에서 [공유]로 보낸 사진 받기 ─────────
 async function sharedToDataUrl(blob) {
