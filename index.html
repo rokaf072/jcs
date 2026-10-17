@@ -295,6 +295,27 @@
   .iosnum { flex:none; width:28px; height:28px; border-radius:50%; background:#4fd1b5; color:#0b1f1b; font-weight:800; display:flex; align-items:center; justify-content:center; }
   .iosarrow { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); font-size:34px; color:#4fd1b5; animation:iosBounce 1.1s infinite; z-index:301; }
   @keyframes iosBounce { 0%,100% { transform:translate(-50%,0); } 50% { transform:translate(-50%,10px); } }
+  /* ── 날씨 전광판 (LED) ── */
+  @font-face { font-family:"JCS LED"; src:url(fonts/Galmuri11-Bold.woff2) format("woff2"); font-display:swap; }
+  .ledbox { position:relative; overflow:hidden; height:36px; border-radius:10px; background:#040506; border:1px solid #23262b; box-shadow:inset 0 0 14px rgba(0,0,0,.95), 0 0 0 1px rgba(255,176,0,.06); flex:0 1 auto; -webkit-mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+  .ledbox.pc { width:clamp(260px, 30vw, 560px); margin-left:10px; align-self:center; }
+  .ledbox.mobile { display:block; margin:8px 2px 2px; height:32px; }
+  .ledbox::after { content:''; position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
+  .ledtrack { display:flex; width:max-content; height:100%; align-items:center; animation:ledScroll 30s linear infinite; will-change:transform; }
+  .ledbox:hover .ledtrack { animation-play-state:paused; }
+  @keyframes ledScroll { from { transform:translateX(0); } to { transform:translateX(calc(-1 * var(--led-w, 50%))); } }
+  .ledline { font-family:"JCS LED","Galmuri11",monospace; font-size:18px; letter-spacing:.06em; white-space:pre; color:#ffb000; text-shadow:0 0 2px rgba(255,176,0,.9), 0 0 8px rgba(255,140,0,.45); padding-left:12px; }
+  .ledbox.mobile .ledline { font-size:15px; }
+  .led-t { color:#ff6a3d; text-shadow:0 0 3px #ff6a3d, 0 0 9px rgba(255,90,40,.6); }
+  .led-c { color:#4fdcff; text-shadow:0 0 3px #4fdcff, 0 0 9px rgba(60,200,255,.55); }
+  .led-g { color:#3dff7a; text-shadow:0 0 3px #3dff7a, 0 0 9px rgba(60,255,120,.5); }
+  .led-y { color:#ffe14d; text-shadow:0 0 3px #ffe14d, 0 0 9px rgba(255,220,70,.5); }
+  .led-o { color:#ff9a2e; text-shadow:0 0 3px #ff9a2e, 0 0 9px rgba(255,150,40,.55); }
+  .led-r { color:#ff3b3b; text-shadow:0 0 3px #ff3b3b, 0 0 10px rgba(255,50,50,.7); animation:ledBlink 1.2s steps(2) infinite; }
+  .led-dim { color:#5c4300; text-shadow:none; }
+  @keyframes ledBlink { 50% { opacity:.35; } }
+  @media (prefers-reduced-motion:reduce) { .ledtrack { animation:none; } }
+  html.printing .ledbox { display:none !important; }
 </style>
 </head>
 <body>
@@ -325,5 +346,6 @@
 <script src="zoom.js"></script>
 <script src="news.js"></script>
 <script src="onair.js"></script>
+<script src="weather.js"></script>
 </body>
 </html>
