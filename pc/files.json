@@ -1,5 +1,5 @@
 {
-"version": "3.40.0",
+"version": "3.40.1",
 "files": [
 {
 "p": "app.html",
@@ -7,7 +7,7 @@
 },
 {
 "p": "app.js",
-"h": "994e9df21f99a29f4f084e0f2da816a153da56ee"
+"h": "ba82c0b746abdf33a99b602a8a60bf8c1c596906"
 },
 {
 "p": "app.webmanifest",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "692ada36267dd26f9f1f6a642b42d38847cf80e2"
+"h": "3d88564618f1eb4d1c04ca1ad10366b6f5dbee72"
 },
 {
 "p": "news.js",

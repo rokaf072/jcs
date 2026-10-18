@@ -984,6 +984,19 @@ async function init(force = false) {
   } catch (e) { status(e.message, true); }
 }
 
+// 방송 날 오늘 글을 보고 있으면 3분마다 새 글·수정 확인 (뉴스직격은 코너마다 글이 따로 올라옴 → 뒤 코너도 자동으로 붙음)
+setInterval(async () => {
+  try {
+    if (document.hidden || !current || $('#dateSel').value !== todayStr()) return;
+    const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(), wd = n.getDay();
+    if (wd === 0 || wd === 6 || hm < PROG.fastFrom - 120 || hm >= PROG.off) return;
+    const before = (posts.find((p) => p.date === todayStr()) || {}).updated;
+    await fetchList();
+    status('');
+    const p = posts.find((x) => x.date === todayStr());
+    if (p && p.updated !== before) { const y = window.scrollY; await show(todayStr()); window.scrollTo(0, y); }
+  } catch (e) {}
+}, 3 * 60000);
 $('#dateSel').onchange = async (e) => { await show(e.target.value); window.scrollTo(0, 0); saveView(); };
 $('#refresh').onclick = () => init(true);
 $('#today').onclick = async () => { fillSelect(todayStr()); await show(todayStr()); window.scrollTo(0, 0); saveView(); };

@@ -586,12 +586,29 @@ async function adminLogin() {
 }
 { let n = 0, t = 0; const h = document.querySelector('header h1');
   if (h) h.addEventListener('click', () => { if (isOwner()) return; const now = Date.now(); n = now - t < 600 ? n + 1 : 1; t = now; if (n >= 5) { n = 0; adminLogin(); } }); }
+// ───────── 앱 버전 확인·업데이트 (설정 → 최신 버전 확인) ─────────
+async function appVersion() {
+  try { const k = (await caches.keys()).find((x) => /^jcs-guest-v\d+$/.test(x)); return k ? k.replace('jcs-guest-', '') : ''; } catch (e) { return ''; }
+}
+async function checkAppUpdate() {
+  const cur = await appVersion();
+  let latest = '';
+  try { latest = ((await (await fetch('sw.js?t=' + Date.now(), { cache: 'no-store' })).text()).match(/jcs-guest-(v\d+)/) || [])[1] || ''; } catch (e) {}
+  if (!latest) { alert('인터넷 연결을 확인한 뒤 다시 눌러 주세요.'); return; }
+  if (latest === cur) { alert(`최신 버전이에요. (${cur})`); return; }
+  if (!confirm(`새 버전 ${latest}이(가) 나왔어요. (지금 ${cur || '—'})\n\n지금 업데이트할까요?`)) return;
+  status('새 버전으로 업데이트하는 중…');
+  try { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch (e) {}
+  setTimeout(() => location.reload(), 1500);
+}
 function openSettings() {
   const ov = el('div', 'overlay'), box = el('div', 'picker');
   box.append(el('div', 'ptitle', '설정'));
-  const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); };
+  const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); return b; };
+  const updRow = () => { const b = row('🔄 최신 버전 확인', '확인 중…', checkAppUpdate); appVersion().then((v) => { b.lastChild.textContent = `지금 버전 ${v || '—'} · 누르면 새 버전이 있는지 확인`; }); };
   if (!isOwner()) {   // 직원 폰: 사진 새로 받기 + 관리자 로그인만
     row('사진 새로 받기', '관리자가 고른 최신 사진을 바로 가져와요', async () => { const got = await syncPull(true); if (got && current) render(current); alert(got ? `새 사진 ${got}건을 받아왔어요.` : '이미 최신이에요.'); });
+    updRow();
     const close0 = el('button', 'pclose', '닫기'); close0.onclick = () => ov.remove();
     box.append(close0); ov.append(box); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
     document.body.append(ov); return;
@@ -625,6 +642,7 @@ function openSettings() {
     a.download = `정치쇼사진백업_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`; a.click();
     status(`사진 ${n}명분을 백업 파일로 저장했어요. (다운로드 폴더)`);
   });
+  updRow();
   row('사진 복원', '백업 파일에서 사진 되살리기 (PC 백업 파일도 가능)', () => {
     const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json';
     f.onchange = async () => {
@@ -642,6 +660,19 @@ $('#settings').onclick = openSettings;
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // 앱으로 돌아왔을 때: 오늘을 보고 있을 때만 다시 확인 (지난 날짜를 직접 골라 보고 있으면 그대로 둠)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#dateSel').value === todayStr()) init(false); });
+// 방송 날 오늘 글을 보고 있으면 3분마다 새 글·수정 확인 (뉴스직격은 코너마다 글이 따로 올라옴 → 뒤 코너도 자동으로 붙음)
+setInterval(async () => {
+  try {
+    if (document.hidden || !current || $('#dateSel').value !== todayStr()) return;
+    const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(), wd = n.getDay();
+    if (wd === 0 || wd === 6 || hm < PROG.fastFrom - 120 || hm >= PROG.off) return;
+    const before = (posts.find((p) => p.date === todayStr()) || {}).updated;
+    await fetchList();
+    status('');
+    const p = posts.find((x) => x.date === todayStr());
+    if (p && p.updated !== before) { const y = window.scrollY; await show(todayStr()); window.scrollTo(0, y); }
+  } catch (e) {}
+}, 3 * 60000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
 
 // ───────── 출연자 검색: 이름·소속을 치면 언제 출연했는지 ─────────
