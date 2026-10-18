@@ -451,6 +451,7 @@
   .ledbox { position:relative; overflow:hidden; height:36px; border-radius:10px; background:#040506; border:1px solid #23262b; box-shadow:inset 0 0 14px rgba(0,0,0,.95), 0 0 0 1px rgba(255,176,0,.06); flex:0 1 auto; -webkit-mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
   .ledspot { display:flex; justify-content:center; min-width:0; }
   .ledbox.pc { width:clamp(300px, 36vw, 640px); max-width:100%; }
+  .ledbox.pc.ledfloat { position:absolute; max-width:none; z-index:2; transition:top .2s; }
   .ledbox.mobile { display:block; margin:8px 2px 2px; height:32px; }
   .ledbox::after { content:''; position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
   .ledtrack { display:flex; width:max-content; height:100%; align-items:center; animation:ledScroll 30s linear infinite; will-change:transform; }

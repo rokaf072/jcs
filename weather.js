@@ -61,6 +61,31 @@
     else { const head = document.querySelector('header'); if (head) head.append(box); else document.body.prepend(box); box.classList.add('mobile'); }
     return box;
   }
+  // PC 새 머리글: 전광판을 타이틀 줄 오른쪽에, 아래 [오늘의 출연자]의 '출' 글자부터 [오늘] 단추 끝까지 같은 길이로
+  function placeLED() {
+    const header = document.querySelector('header.titled'), tab = document.getElementById('tabGuests'), nav = document.querySelector('header .datenav'), row = document.querySelector('header .hrow1');
+    if (!box || !header || !tab || !nav || !row) { if (box) box.classList.remove('ledfloat'); return; }
+    const hr = header.getBoundingClientRect(), rr = row.getBoundingClientRect();
+    let x0 = tab.getBoundingClientRect().left;
+    try {   // '출' 글자의 왼쪽 끝 위치
+      const walk = document.createTreeWalker(tab, NodeFilter.SHOW_TEXT); let n;
+      while ((n = walk.nextNode())) { const i = n.textContent.indexOf('출'); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); x0 = r.getBoundingClientRect().left; break; } }
+    } catch (e) {}
+    const h1 = header.querySelector('h1'), titleEnd = h1 ? h1.getBoundingClientRect().right + 24 : 0;
+    const date = header.querySelector('.hrow1 .date'), dateEnd = date ? date.getBoundingClientRect().right + 16 : 0;
+    const left = Math.max(x0, titleEnd, dateEnd), right = nav.getBoundingClientRect().right;
+    if (right - left < 260) { box.classList.remove('ledfloat'); box.style.cssText = ''; return; }   // 화면이 좁으면 원래 자리
+    box.classList.add('ledfloat');
+    box.style.left = Math.round(left - hr.left) + 'px';
+    box.style.width = Math.round(right - left) + 'px';
+    box.style.top = Math.round(rr.top - hr.top + (rr.height - box.offsetHeight) / 2) + 'px';
+  }
+  let placeQueued = false;
+  const queuePlace = () => { if (placeQueued) return; placeQueued = true; requestAnimationFrame(() => { placeQueued = false; placeLED(); }); };
+  window.addEventListener('resize', queuePlace);
+  window.addEventListener('scroll', queuePlace, { passive: true });
+  if (window.ResizeObserver) { const ro = new ResizeObserver(queuePlace); const watch = () => { const h = document.querySelector('header'); if (h) ro.observe(h); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch(); }
+  document.addEventListener('jcsrender', queuePlace);
   function render(w) {
     const segs = segments(w);
     if (!segs.length) return;
@@ -74,6 +99,7 @@
     const gap = document.createElement('span'); gap.className = 'ledgap'; gap.textContent = '      ';
     line.append(gap);
     track.append(line, line.cloneNode(true));
+    queuePlace();
     requestAnimationFrame(() => {
       const w1 = line.getBoundingClientRect().width;
       const sec = Math.max(14, w1 / 55);   // 1초에 약 55px — 전광판처럼 천천히
@@ -195,11 +221,16 @@
     let w = base;
     if (mode() === 'here' && window.jcsIsMember && !window.jcsIsMember()) { if (base) render(base); setTimeout(() => load(1), 15000); return; }   // 가입 전엔 위치를 묻지 않음
     if (mode() === 'here') {
-      const g = await position(maxAgeMin).catch(() => null);
+      // 위치 허용 창에 아직 답을 안 했거나 위치 확인이 늦으면 → 먼저 목동 날씨를 보여주고, 위치가 오면 바꿈
+      const posP = position(maxAgeMin).catch(() => null);
+      let g = await Promise.race([posP, new Promise((ok) => setTimeout(() => ok('wait'), 3000))]);
+      if (g === 'wait') { if (base) { render(base); titleFor(base); } g = await posP; }
       if (g && km([g.lat, g.lon], MOK) > 3) w = (await here(g, base).catch(() => null)) || base;
     }
     if (!w) return;
-    render(w);
+    render(w); titleFor(w);
+  }
+  function titleFor(w) {
     const bad = (ls.get('jcsGeo') || {}).bad && !ls.get('jcsWxPlace');
     if (box) box.title = w.here ? `${w.place} 날씨 (Open-Meteo) · 누르면 ${ls.get('jcsWxPlace') ? '동네 바꾸기' : '목동(SBS) 날씨로'}`
       : bad ? '목동(SBS) 날씨 · 이 기기는 위치를 정확히 몰라요. 누르면 동네를 직접 정할 수 있어요'
