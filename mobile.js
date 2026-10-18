@@ -350,12 +350,28 @@ function dnavState() {
   const sel = $('#dateSel'), i = sel.selectedIndex, n = sel.options.length;
   $('#dPrev').disabled = i < 0 || i >= n - 1; $('#dNext').disabled = i <= 0;
 }
-async function stepDay(dir) {   // dir -1 = 전날, +1 = 다음날
+const SW = { busy: false };
+function swSet(x, ms, ease) {   // 출연자 화면을 x만큼 옆으로 (ms: 애니메이션 시간)
+  const m = $('#main');
+  m.style.transition = ms ? `transform ${ms}ms ${ease || 'cubic-bezier(.2,.8,.2,1)'}, opacity ${ms}ms ease` : 'none';
+  m.style.transform = x ? `translate3d(${x}px,0,0)` : '';
+  m.style.opacity = x ? String(Math.max(0.25, 1 - Math.abs(x) / window.innerWidth * 0.85)) : '';
+}
+const swWait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function stepDay(dir, fromX) {   // dir -1 = 전날, +1 = 다음날 · 화면이 미끄러지듯 넘어감
   const sel = $('#dateSel'), i = sel.selectedIndex - dir;
-  if (i < 0 || i >= sel.options.length) return false;
+  if (SW.busy || i < 0 || i >= sel.options.length) return false;
+  SW.busy = true;
+  const W = window.innerWidth, out = Math.abs(fromX || 0);
+  const t1 = Math.round(90 + 150 * (1 - out / W));          // 남은 거리만큼만 빠지게
+  swSet(-dir * W, t1, 'cubic-bezier(.4,0,.9,.6)'); await swWait(t1);
   sel.selectedIndex = i; dnavState();
-  const m = $('#main'); m.classList.remove('swl', 'swr'); void m.offsetWidth; m.classList.add(dir > 0 ? 'swl' : 'swr');
-  await show(sel.value); window.scrollTo(0, 0); saveView(); return true;
+  try { await show(sel.value); } catch (e) {}
+  window.scrollTo(0, 0); saveView();
+  swSet(dir * W * 0.45, 0); void $('#main').offsetWidth;
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  swSet(0, 320); await swWait(330);
+  $('#main').style.transition = ''; SW.busy = false; return true;
 }
 function waitingMessage(date) {
   const dow = new Date(date + 'T00:00:00').getDay();
@@ -440,25 +456,52 @@ async function init(force = false) {
 $('#dateSel').onchange = async (e) => { dnavState(); await show(e.target.value); window.scrollTo(0, 0); saveView(); };
 $('#dPrev').onclick = () => stepDay(-1);
 $('#dNext').onclick = () => stepDay(1);
-// 화면을 옆으로 쓸어도 날짜 이동 (오른쪽→왼쪽 = 다음날, 왼쪽→오른쪽 = 전날)
+// 화면을 손가락으로 끌면 손가락 따라 같이 움직이고, 놓으면 다음/전날로 미끄러짐
 (() => {
-  let sx = 0, sy = 0, st = 0, ok = false;
-  const main = $('#main');
+  const main = $('#main'); main.style.touchAction = 'pan-y';
+  const hint = el('div', 'swhint'); document.body.append(hint);
+  let sx = 0, sy = 0, dx = 0, mode = -1, raf = 0, lx = 0, lt = 0, vel = 0;
+  const tgt = (dir) => { const sel = $('#dateSel'), i = sel.selectedIndex - dir; return i >= 0 && i < sel.options.length ? sel.options[i] : null; };
+  const paint = () => {
+    raf = 0; const dir = dx < 0 ? 1 : -1, o = tgt(dir), W = window.innerWidth;
+    const x = o ? dx : Math.sign(dx) * Math.pow(Math.abs(dx), 0.7) * 1.4;   // 끝 날짜면 고무줄처럼 버팀
+    swSet(x, 0);
+    const p = Math.min(1, Math.abs(dx) / (W * 0.28));
+    hint.textContent = o ? (dir > 0 ? o.textContent.split(' · ')[0] + ' ▶' : '◀ ' + o.textContent.split(' · ')[0]) : (dir > 0 ? '가장 최근 날짜예요' : '더 이전 글이 없어요');
+    hint.className = 'swhint show ' + (dir > 0 ? 'r' : 'l') + (p >= 1 && o ? ' go' : '');
+    hint.style.opacity = String(Math.min(1, p * 1.2));
+  };
   main.addEventListener('touchstart', (e) => {
-    const t = e.touches[0]; ok = e.touches.length === 1;
-    for (let n = e.target; ok && n && n !== main; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) ok = false;
-    sx = t.clientX; sy = t.clientY; st = Date.now();
+    mode = -1; if (SW.busy || e.touches.length !== 1 || document.querySelector('.zoomov, .nov, .picker')) return;
+    for (let n = e.target; n && n !== main; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return;
+    const t = e.touches[0]; sx = lx = t.clientX; sy = t.clientY; lt = e.timeStamp; dx = 0; vel = 0; mode = 0;
   }, { passive: true });
-  main.addEventListener('touchend', (e) => {
-    if (!ok) return; ok = false;
-    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    if (Date.now() - st > 700 || Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2) return;
-    if (document.querySelector('.zoomov, .nov, .picker')) return;
-    stepDay(dx < 0 ? 1 : -1);
+  main.addEventListener('touchmove', (e) => {
+    if (mode < 0) return;
+    const t = e.touches[0], mx = t.clientX - sx, my = t.clientY - sy;
+    if (mode === 0) {
+      if (Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my) * 1.3) { mode = 1; sx = t.clientX - Math.sign(mx) * 8; }
+      else if (Math.abs(my) > 8) { mode = -1; return; } else return;
+    }
+    dx = t.clientX - sx;
+    const dt = e.timeStamp - lt; if (dt > 0) vel = 0.7 * ((t.clientX - lx) / dt) + 0.3 * vel;
+    lx = t.clientX; lt = e.timeStamp;
+    if (!raf) raf = requestAnimationFrame(paint);
   }, { passive: true });
+  const end = () => {
+    if (mode !== 1) { mode = -1; return; } mode = -1;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    hint.className = 'swhint'; hint.style.opacity = '';
+    const dir = dx < 0 ? 1 : -1, W = window.innerWidth;
+    const fling = Math.abs(vel) > 0.45 && Math.sign(vel) === Math.sign(dx) && Math.abs(dx) > 30;
+    if (tgt(dir) && (Math.abs(dx) > W * 0.28 || fling)) stepDay(dir, dx);
+    else swSet(0, 380, 'cubic-bezier(.2,1.25,.4,1)');   // 제자리로 살짝 튕기며 복귀
+  };
+  main.addEventListener('touchend', end, { passive: true });
+  main.addEventListener('touchcancel', end, { passive: true });
 })();
 $('#refresh').onclick = () => init(true);
-$('#today').onclick = async () => { const m = $('#main'); m.classList.remove('swl', 'swr'); fillSelect(todayStr()); await show(todayStr()); window.scrollTo(0, 0); saveView(); };
+$('#today').onclick = async () => { fillSelect(todayStr()); await show(todayStr()); window.scrollTo(0, 0); saveView(); };
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
 // ───────── 설정: 카카오 키 / 사진 백업 / 사진 복원 ─────────
 

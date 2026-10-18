@@ -52,8 +52,11 @@
   .row2 #refresh { font-size:19px; font-weight:800; }
   .row2 .dnav:disabled { opacity:.3; }
   .row2 #today { flex:0 0 auto; padding:8px 12px; }
-  #main.swl { animation:swl .22s ease-out; } #main.swr { animation:swr .22s ease-out; }
-  @keyframes swl { from { transform:translateX(40px); opacity:.3; } } @keyframes swr { from { transform:translateX(-40px); opacity:.3; } }
+  html, body { overflow-x:hidden; overflow-x:clip; }
+  #main { will-change:transform; backface-visibility:hidden; }
+  .swhint { position:fixed; top:50%; z-index:4; transform:translateY(-50%) scale(.92); padding:10px 16px; border-radius:999px; background:rgba(15,23,42,.85); color:#e2e8f0; font-size:15px; font-weight:800; pointer-events:none; opacity:0; transition:transform .15s, background .15s; white-space:nowrap; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+  .swhint.l { left:12px; } .swhint.r { right:12px; }
+  .swhint.go { transform:translateY(-50%) scale(1.04); background:var(--brand-d, #0f766e); color:#fff; }
   .icon-btn { background:transparent; color:#fff; border:none; font-size:20px; padding:4px 6px; }
   #status { padding:6px 14px; font-size:12.5px; color:var(--sub); min-height:18px; }
   #status.err { color:#b3261e; font-weight:600; }
