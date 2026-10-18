@@ -68,12 +68,12 @@
     if (!again) chime(n.level === 'urgent');
   }
 
-  async function check() {
-    if (document.hidden) return;
+  async function check(force) {   // force: 알림을 눌러서 열었을 때 → 이미 봤어도 그 알림을 다시 크게
+    if (document.hidden && !force) return;
     if (window.jcsIsMember && !window.jcsIsMember()) return;   // 가입 전에는 안 띄움
     const n = await fetchNotice();
     current = n;
-    if (n && n.id !== seen()) show(n);
+    if (n && (n.id !== seen() || (force && (force === true || force === n.id)))) { if (force) shown = false; show(n, false); }
   }
 
   // ── 관리자: 알림 쓰기 ──
@@ -195,7 +195,9 @@
     card.append(yes, no); document.body.append(card);
   }
   // 알림을 눌러 앱이 열리면 → 큰 알림 화면
-  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.type === 'jcsNotice') { shown = false; check(); } });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.type === 'jcsNotice') check(e.data.id || true); });
+  // 꺼져 있던 앱을 알림으로 열었을 때 (주소에 ?notice=…)
+  try { const q = new URLSearchParams(location.search).get('notice'); if (q) { setTimeout(() => check(q), 1200); history.replaceState(null, '', location.pathname); } } catch (e) {}
   setTimeout(askOnce, 5000);
 
   window.jcsNotice = { compose, owner, again: () => (current ? (shown = false, show(current, true), true) : false), check, subscribe, pushState, iosGuide };
