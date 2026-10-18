@@ -1,5 +1,5 @@
 {
-"version": "3.39.1",
+"version": "3.39.2",
 "files": [
 {
 "p": "app.html",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "add93fa4acd9146e0980daa9f6037c41e2064d6c"
+"h": "9dbdb26022cfea9db3952eeb8ffaa7b9969645d3"
 },
 {
 "p": "news.js",
@@ -75,7 +75,7 @@
 },
 {
 "p": "weather.js",
-"h": "e4119efc68baaaa8f0ce50b1af22b152f4c921e9"
+"h": "286aa2fbe8e8a3feb3098c08b5174ca08321ac14"
 },
 {
 "p": "web-shim.js",

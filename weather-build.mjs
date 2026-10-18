@@ -15,6 +15,7 @@ const kst = (d = new Date()) => new Date(d.getTime() + 9 * 3600e3);
 const ymd = (d) => d.toISOString().slice(0, 10).replace(/-/g, '');
 const hhmm = (d) => d.toISOString().slice(11, 16).replace(':', '');
 
+let LASTERR = '';   // 기상청이 안 될 때 원인 (weather.json 의 err 로 남김)
 async function getJSON(url, tries = 3) {
   for (let i = 0; i < tries; i++) {
     try {
@@ -22,7 +23,8 @@ async function getJSON(url, tries = 3) {
       const t = await r.text();
       if (t.trim().startsWith('{')) return JSON.parse(t);
       console.log('응답이 JSON이 아님:', t.slice(0, 200));
-    } catch (e) { console.log('실패', i + 1, e.message); }
+      LASTERR = (r.status + ' ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).slice(0, 160);
+    } catch (e) { console.log('실패', i + 1, e.message); LASTERR = 'fetch ' + e.message; }
     await new Promise((x) => setTimeout(x, 2000));
   }
   return null;
@@ -120,5 +122,6 @@ const out = { at: Date.now(), place: '목동', ok: {} };
   }
   if (!out.ok.warn && prev.warns) out.warns = prev.warns;
 }
+if (LASTERR && !(out.ok.now && out.ok.fcst)) out.err = LASTERR;
 writeFileSync('weather.json', JSON.stringify(out));
 console.log('날씨 저장', JSON.stringify(out.ok), out.now ? out.now.t + '°' : '');

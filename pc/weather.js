@@ -187,7 +187,11 @@
     } catch (e) { return null; }
   }
   async function load(maxAgeMin = 1e9) {
-    const base = await mokdong();
+    let base = await mokdong();
+    if (!base) {   // 기상청 자료가 비었으면(기상청 장애 등) 목동 날씨를 Open-Meteo에서 바로
+      const m = await here({ lat: MOK[0], lon: MOK[1], place: '목동' }, null).catch(() => null);
+      if (m) base = { ...m, here: false, alt: true };
+    }
     let w = base;
     if (mode() === 'here' && window.jcsIsMember && !window.jcsIsMember()) { if (base) render(base); setTimeout(() => load(1), 15000); return; }   // 가입 전엔 위치를 묻지 않음
     if (mode() === 'here') {
@@ -199,6 +203,7 @@
     const bad = (ls.get('jcsGeo') || {}).bad && !ls.get('jcsWxPlace');
     if (box) box.title = w.here ? `${w.place} 날씨 (Open-Meteo) · 누르면 ${ls.get('jcsWxPlace') ? '동네 바꾸기' : '목동(SBS) 날씨로'}`
       : bad ? '목동(SBS) 날씨 · 이 기기는 위치를 정확히 몰라요. 누르면 동네를 직접 정할 수 있어요'
+      : w.alt ? '목동(SBS) 날씨 · 기상청이 잠시 응답이 없어 Open-Meteo로 대신 보여줘요'
       : `목동(SBS) 날씨 · 기상청·에어코리아${mode() === 'here' ? ' (지금 목동 근처예요)' : ' · 누르면 현위치 날씨로'}`;
   }
   document.addEventListener('click', async (e) => {
