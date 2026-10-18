@@ -3,7 +3,9 @@
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
-const GNLOG = { ok: 0, fail: 0, codes: {} };
+const GNLOG = { ok: 0, fail: 0, codes: {} }, BINGLOG = {};
+// 구글 뉴스가 막혔을 때 대신: 빙(Bing) 뉴스 RSS — 무료, 키 없음, 실제 기사 주소가 바로 들어 있어 구글에 다시 물어볼 필요 없음
+const BING = (q) => 'https://www.bing.com/news/search?q=' + encodeURIComponent(q) + '&format=rss&mkt=ko-KR&setlang=ko&qft=sortbydate%3d%221%22';
 const GN = (q) => 'https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=ko&gl=KR&ceid=KR:ko';
 const PAPERS = [
   { name: '조선일보', site: 'chosun.com', feeds: ['https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml', 'https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml'] },
@@ -33,7 +35,9 @@ function parseRSS(xml, paper, src) {
     title = title.replace(SUFFIX, '');
     if (desc.startsWith(title.slice(0, 20))) desc = '';
     const t = Date.parse(strip(tag(it, 'pubDate'))) || 0;
-    return { paper, title, link: strip(tag(it, 'link')), desc: desc.slice(0, 140), t };
+    let link = strip(tag(it, 'link'));
+    if (src === 'bing') { try { link = new URL(link).searchParams.get('url') || link; } catch (e) {} }
+    return { paper, title, link, desc: desc.slice(0, 140), t };
   }).filter((x) => x.title && x.link && !isForeign(x) && (!x.t || Date.now() - x.t < MAX_AGE));
 }
 const FEEDLOG = {};   // 신문사 RSS 상태 기록 (news.json의 diag.feeds 로 남김 → 안 나올 때 원인 확인용)
@@ -66,7 +70,16 @@ async function loadPaper(p) {
   // 경제 기사 (한국경제): 경제·금융 RSS + 구글 뉴스 보조
   for (const u of p.eco || []) jobs.push(Promise.resolve(rssOf(u).map((i) => ({ ...i, eco: true }))));
   if (p.eco) jobs.push(getText(GN(`site:${p.site}/economy when:1d`)).then((x) => parseRSS(x, p.name, 'gn').map((i) => ({ ...i, eco: true }))));
-  const all = (await Promise.all(jobs)).flat();
+  let all = (await Promise.all(jobs)).flat();
+  // 구글 뉴스에서 이 신문 기사를 하나도 못 받았으면(막힘) → 빙 뉴스로 다시 시도
+  if (!all.some((i) => /news\.google\.com/.test(i.link))) {
+    const qs = [[`site:${p.site} SBS`, { sbsQ: true }], [`site:${p.site} 방송`, {}]];
+    if (!p.feeds.length || p.name === '중앙일보' || rssEmpty) qs.push([`site:${p.site} 정치`, {}]);
+    if (p.eco) qs.push([`site:${p.site} 경제`, { eco: true }]);
+    const got = await Promise.all(qs.map(([q, extra]) => getText(BING(q)).then((x) => parseRSS(x, p.name, 'bing').filter((i) => i.link.includes(p.site)).map((i) => ({ ...i, ...extra })))));
+    BINGLOG[p.name] = got.map((g) => g.length);
+    all = all.concat(got.flat());
+  }
   const seen = new Map(), out = [];
   for (const i of all.sort((a, b) => (b.desc ? 1 : 0) - (a.desc ? 1 : 0))) {
     const k = keyOf(i.title);
@@ -229,5 +242,6 @@ diag.withSum = items.filter((i) => i.sum).length;
 diag.feeds = FEEDLOG;
 diag.carried = carried;
 diag.gn = GNLOG;
+diag.bing = BINGLOG;
 console.log('기사 수', Object.fromEntries(PAPERS.map((p, n) => [p.name, lists[n].length])), '요약', diag);
 writeFileSync('news.json', JSON.stringify({ at: Date.now(), diag, items }));
