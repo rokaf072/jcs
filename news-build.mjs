@@ -211,7 +211,9 @@ const want = [...new Set(wanted)];
 // 이전에 요약해 둔 건 다시 안 받음
 let prev = {};
 try { if (existsSync('news.json')) for (const i of JSON.parse(readFileSync('news.json', 'utf8')).items || []) if (i.sum && i.sum.length && i.sv === 4) prev[keyOf(i.title)] = { url: i.url, img: i.img, sum: i.sum, sv: 4 }; } catch (e) {}   // 요약 방식이 바뀌면(sv) 다시 만듦
-const todo = want.filter((i) => !prev[keyOf(i.title)]).slice(0, 90);
+// 구글 뉴스 주소는 실제 기사 주소를 알아내는 데 구글에 여러 번 물어봐야 함 → 한 번에 너무 많이 물으면 구글이 잠깐 막음 → 회당 25건까지만 (나머지는 다음 회차에)
+let gnLeft = 25;
+const todo = want.filter((i) => !prev[keyOf(i.title)]).filter((i) => !/news\.google\.com/.test(i.link) || gnLeft-- > 0).slice(0, 90);
 const diag = { want: want.length, reused: want.length - todo.length, tried: todo.length, ok: 0, err: {} };
 let k = 0;
 await Promise.all(Array.from({ length: 6 }, async () => {
