@@ -3,13 +3,13 @@
 // 사진(직접 등록한 사진 포함)은 두 프로그램이 같이 씀 → 같은 사람이 나오면 바로 보임
 const JCS_PROGS = {
   jcs: {
-    id: 'jcs', key: '', name: '김태현의 정치쇼', nameIs: '김태현의 정치쇼는', short: '정치쇼', host: '김태현',
+    id: 'jcs', key: '', logo: 'icons/jcs192.png', name: '김태현의 정치쇼', nameIs: '김태현의 정치쇼는', short: '정치쇼', host: '김태현',
     listUrl: 'https://programs.sbs.co.kr/radio/lchshow/board/65364', board: 'lchshow_02',
     on: 7 * 60 + 5, off: 9 * 60, usual: 6 * 60 + 20, fastFrom: 6 * 60,   // 방송 07:05~09:00, 글은 보통 6:20 전
     multi: false, limit: 16, clip: /정치쇼/,
   },
   jyj: {
-    id: 'jyj', key: 'jyj:', name: '최선호의 뉴스직격', nameIs: '최선호의 뉴스직격은', short: '뉴스직격', host: '최선호',
+    id: 'jyj', key: 'jyj:', logo: 'icons/jyj192.png', name: '최선호의 뉴스직격', nameIs: '최선호의 뉴스직격은', short: '뉴스직격', host: '최선호',
     listUrl: 'https://programs.sbs.co.kr/radio/lovefmjyj/board/86084', board: '',
     boardCands: [...Array.from({ length: 20 }, (_, i) => 'lovefmjyj_' + String(i + 1).padStart(2, '0')), 'lovefmjyj'],
     on: 17 * 60, off: 18 * 60, usual: 16 * 60 + 30, fastFrom: 16 * 60,   // 방송 17:00~18:00
@@ -123,12 +123,23 @@ const progParse = (body, title) => (PROG.multi ? parseJYJ(body, title) : parseBo
 // 머리글·창 제목·[정치쇼 | 뉴스직격] 단추
 function progHeader() {
   try { document.title = PROG.name + ' 출연자'; } catch (e) {}
-  const h1 = document.querySelector('header h1');
-  if (h1) h1.textContent = PROG.name + ' 출연자';
+  const header = document.querySelector('header'), h1 = document.querySelector('header h1');
+  if (h1) {   // 타이틀: 프로그램 이름은 크게, '출연자'는 작게
+    h1.textContent = '';
+    const a = document.createElement('span'); a.className = 'pname'; a.textContent = PROG.name;
+    const b = document.createElement('span'); b.className = 'psub'; b.textContent = '출연자';
+    h1.append(a, b); h1.title = PROG.name + ' 출연자';
+  }
   if (document.querySelector('.progsw')) return;
   const sw = document.createElement('div'); sw.className = 'progsw'; sw.setAttribute('role', 'tablist');
   for (const p of Object.values(JCS_PROGS)) {
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = p.short; b.title = `${p.name} (${hhmmStr(p.on)}~${hhmmStr(p.off)})`;
+    const b = document.createElement('button'); b.type = 'button'; b.title = `${p.name} (${hhmmStr(p.on)}~${hhmmStr(p.off)})`;
+    const im = document.createElement('img'); im.src = p.logo; im.alt = ''; im.className = 'swlogo';
+    const t = document.createElement('span'); t.className = 'swname'; t.textContent = p.short;
+    const tm = document.createElement('span'); tm.className = 'swtime'; tm.textContent = `평일 ${hhmmStr(p.on)}~${hhmmStr(p.off)}`;
+    const txt = document.createElement('span'); txt.className = 'swtxt'; txt.append(t, tm);
+    const tag = document.createElement('span'); tag.className = 'swtag'; tag.textContent = p.id === PROG.id ? '✓ 보는 중' : '바꾸기 ›';
+    b.append(im, txt, tag);
     if (p.id === PROG.id) b.className = 'on';
     b.onclick = () => {
       if (p.id === PROG.id) return;
@@ -137,8 +148,20 @@ function progHeader() {
     };
     sw.append(b);
   }
-  if (h1) h1.insertAdjacentElement('afterend', sw);
-  else { const hd = document.querySelector('header'); if (hd) hd.prepend(sw); }
+  const row1 = document.querySelector('header .hrow1');
+  if (row1 && header) {
+    // PC: 맨 위 얇은 줄에 프로그램 고르기, 왼쪽에 큰 로고(타이틀), 오른쪽에 기존 두 줄
+    const bar = document.createElement('div'); bar.className = 'progbar';
+    const lab = document.createElement('span'); lab.className = 'progbar-lab'; lab.textContent = '📻 프로그램 선택';
+    bar.append(lab, sw);
+    header.prepend(bar);
+    const logo = header.querySelector('.hlogo');
+    if (logo) { logo.src = PROG.logo; bar.insertAdjacentElement('afterend', logo); }
+    header.classList.add('titled');
+    const fit = () => header.classList.toggle('compact', window.scrollY > 60);   // 내리면 로고·타이틀을 작게
+    window.addEventListener('scroll', fit, { passive: true }); fit();
+  } else if (h1) h1.insertAdjacentElement('afterend', sw);
+  else if (header) header.prepend(sw);
   document.documentElement.dataset.prog = PROG.id;
 }
 // 뉴스직격: 상징색 파랑으로 화면 색 바꾸기 + 뉴스직격 로고
@@ -154,18 +177,19 @@ function progTheme() {
   if (PROG.id !== 'jyj') return;
   for (const st of document.querySelectorAll('style')) { let t = st.textContent; for (const [a, b] of JYJ_COLORS) t = t.replace(a, b); st.textContent = t; }
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = '#1f56b8';
-  const fav = document.querySelector('link[rel="icon"]'); if (fav) fav.href = 'icons/jyj48.png';
-  const logo = document.querySelector('header .hlogo'); if (logo) { logo.src = 'icons/jyj128.png'; logo.style.borderRadius = '50%'; }
+  
 }
 // 휴대폰: 제목 대신 단추가 있으니 왼쪽에 프로그램 로고
 function progPhoneLogo() {
   const sw = document.querySelector('.row1 .progsw');
   if (!sw || document.querySelector('.proglogo')) return;
   const im = document.createElement('img'); im.className = 'proglogo'; im.alt = '';
-  im.src = PROG.id === 'jyj' ? 'icons/jyj128.png' : 'icons/icon192.png';
-  if (PROG.id === 'jyj') im.style.borderRadius = '50%';
+  im.src = PROG.logo;
   sw.insertAdjacentElement('beforebegin', im);
 }
 progTheme();
-const progInit = () => { progHeader(); progPhoneLogo(); };
+const progInit = () => {
+  progHeader(); progPhoneLogo();
+  const fav = document.querySelector('link[rel="icon"]'); if (fav) fav.href = PROG.id === 'jyj' ? 'icons/jyj48.png' : 'icons/jcs48.png';
+};
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', progInit); else progInit();

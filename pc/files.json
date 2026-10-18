@@ -1,9 +1,9 @@
 {
-"version": "3.40.4",
+"version": "3.41.1",
 "files": [
 {
 "p": "app.html",
-"h": "d3dba2012dfbe0a97dcd8600b84b774509d396b3"
+"h": "e200deeb145a9bc3405c5de082278a8d5edcfa41"
 },
 {
 "p": "app.js",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "aa4ccde486ee82bcb9770fa527ee7d5ff1d68e60"
+"h": "4e2a144dcf86944777eea19c6f6a79295c650b24"
 },
 {
 "p": "news.js",
@@ -59,7 +59,7 @@
 },
 {
 "p": "programs.js",
-"h": "d7391d72809b9504147e18ed011bcdf32b312897"
+"h": "4ebed18041e84cf75a8e7bd9e6b5c9d1a62b9d08"
 },
 {
 "p": "rails.js",
@@ -99,11 +99,11 @@
 },
 {
 "p": "icons/icon128.png",
-"h": "b508be92d6849593c11a76722fb48a2417f3d76d"
+"h": "3d03aac81e7da29e684add7574fdbda39ebb692d"
 },
 {
 "p": "icons/icon16.png",
-"h": "90a968e4ac89f7d1812086118670ca561a815200"
+"h": "f4d36eb1e1e44796f029d1c8ddbb561df0cc2d43"
 },
 {
 "p": "icons/icon192.png",
@@ -111,11 +111,11 @@
 },
 {
 "p": "icons/icon32.png",
-"h": "6a00238e9ba11eb7643c3ec2d8561e0b2a1872dc"
+"h": "d51358dc5ddc21a68360383a09ca7dab8083abb3"
 },
 {
 "p": "icons/icon48.png",
-"h": "86b3f7a4086bee82e8bc252acab002a41748a3ea"
+"h": "0be60adac1443063bf22d8494418f804563724f5"
 },
 {
 "p": "icons/icon512.png",
@@ -123,7 +123,23 @@
 },
 {
 "p": "icons/jcs.ico",
-"h": "e89e9b9c43c1f2177a41fb08635882a2a445c9c6"
+"h": "a0e4e1806a037a9f27d45f9e89f9d02ffb1b8d35"
+},
+{
+"p": "icons/jcs128.png",
+"h": "6584d7a12c68919b3b8bddd49c39ce7ca52a0c10"
+},
+{
+"p": "icons/jcs192.png",
+"h": "bb72608ef0ba9367c9d4985542be1b3fa39efa20"
+},
+{
+"p": "icons/jcs48.png",
+"h": "6414e717e9882ca285830e036aa3e6fb57f8a235"
+},
+{
+"p": "icons/jcs512.png",
+"h": "e954ba41507cc3eb9d28f7ed7507df82adb2748f"
 },
 {
 "p": "icons/jyj128.png",

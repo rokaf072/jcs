@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>정치쇼 출연자</title>
-<link rel="icon" href="icons/icon32.png">
+<link rel="icon" href="icons/jcs48.png">
 <script src="web-shim.js"></script>
 <link rel="manifest" href="app.webmanifest">
 <script src="theme.js"></script>
@@ -50,7 +50,7 @@
   /* C안: 밝은 흰 메뉴 + 큰 색 타일 버튼 */
   header { background:var(--head); color:var(--ink); padding:12px 24px 10px; border-bottom:1px solid var(--line); box-shadow:0 4px 14px rgba(20,60,50,.08); position:sticky; top:0; z-index:20; }
   .hrow1 { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-  .hlogo { width:58px; height:58px; border-radius:15px; flex:none; box-shadow:0 0 0 2px var(--brand), 0 6px 18px rgba(0,0,0,.35); }   /* 프로그램 로고: 크게, 눈에 띄게 */
+  .hlogo { width:58px; height:58px; border-radius:50%; flex:none; }
   header h1 { font-size:21px; margin:0; font-weight:800; letter-spacing:-.3px; color:var(--brand-d); }
   header .date { font:inherit; font-size:20px; font-weight:800; color:var(--brand-d); background:var(--soft2); padding:4px 14px; border-radius:20px; border:1px solid var(--line); cursor:pointer; }
   header .date::after { content:' 📅'; font-size:16px; }
@@ -468,12 +468,41 @@
   @keyframes ledBlink { 50% { opacity:.35; } }
   @media (prefers-reduced-motion:reduce) { .ledtrack { animation:none; } }
   html.printing .ledbox { display:none !important; }
-  /* 프로그램 고르기 [정치쇼 | 뉴스직격] */
-  .progsw { display:inline-flex; background:var(--soft, #eef2f1); border:1px solid var(--line, #d9e1df); border-radius:999px; padding:3px; gap:2px; }
-  .progsw button { border:none; background:transparent; color:var(--sub, #667); font:inherit; font-size:14px; font-weight:800; padding:6px 15px; border-radius:999px; cursor:pointer; white-space:nowrap; }
-  .progsw button:hover { color:var(--ink, #222); }
-  .progsw button.on { background:var(--brand-d, #0f766e); color:var(--card, #fff); box-shadow:0 1px 3px rgba(0,0,0,.18); cursor:default; }
-  html.printing .progsw { display:none !important; }
+  /* 프로그램 고르기 — 머리글 맨 위: 한눈에 '골라서 누르는 곳'으로 보이게 (채널 고르기 단추) */
+  .progbar { display:flex; align-items:center; gap:12px; margin:0 0 10px; }
+  .progbar-lab { font-size:14px; font-weight:900; color:var(--ink); white-space:nowrap; }
+  .progsw { display:inline-flex; gap:10px; }
+  .progsw button { position:relative; display:inline-flex; align-items:center; gap:10px; font:inherit; text-align:left; cursor:pointer; white-space:nowrap;
+    padding:6px 12px 6px 6px; border-radius:14px; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+    box-shadow:0 2px 6px rgba(0,0,0,.18); transition:transform .12s, border-color .12s, box-shadow .12s; }
+  .progsw button:not(.on):hover { transform:translateY(-2px); border-color:var(--brand); box-shadow:0 6px 16px rgba(0,0,0,.28); }
+  .progsw button.on { background:linear-gradient(135deg, var(--brand-d), var(--brand)); border-color:transparent; color:var(--card); cursor:default;
+    box-shadow:0 0 0 3px rgba(79,209,181,.25), 0 6px 16px rgba(0,0,0,.3); }
+  .progsw .swlogo { width:34px; height:34px; border-radius:50%; flex:none; background:#fff; }
+  .progsw .swtxt { display:flex; flex-direction:column; line-height:1.15; }
+  .progsw .swname { font-size:15.5px; font-weight:900; }
+  .progsw .swtime { font-size:11.5px; font-weight:700; opacity:.75; }
+  .progsw .swtag { font-size:12px; font-weight:900; padding:3px 9px; border-radius:999px; margin-left:4px; }
+  .progsw button.on .swtag { background:rgba(255,255,255,.25); color:var(--card); }
+  .progsw button:not(.on) .swtag { background:var(--soft2); color:var(--brand-d); border:1px solid var(--brand); }
+  .progsw button:not(.on):hover .swtag { background:var(--brand); color:var(--card); }
+  html.printing .progsw, html.printing .progbar { display:none !important; }
+  /* 타이틀: 왼쪽 큰 동그란 로고 + 큰 프로그램 이름 (내리면 작아짐) */
+  header.titled { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:22px; align-items:center; padding-top:8px; }
+  header.titled > .progbar { grid-column:1 / -1; }
+  header.titled > .hlogo { grid-column:1; grid-row:2 / span 2; align-self:center; width:122px; height:122px; border-radius:50%;
+    box-shadow:0 0 0 3px var(--brand), 0 0 0 9px rgba(79,209,181,.14), 0 12px 30px rgba(0,0,0,.45); transition:width .2s, height .2s; }
+  header.titled > .hrow1, header.titled > .hrow2 { grid-column:2; min-width:0; }
+  header.titled > :not(.progbar):not(.hlogo):not(.hrow1):not(.hrow2) { grid-column:1 / -1; }
+  header h1 { display:flex; align-items:baseline; gap:10px; white-space:nowrap; }
+  header h1 .pname { font-size:40px; font-weight:900; letter-spacing:-1.2px; line-height:1.1;
+    background:linear-gradient(90deg, var(--brand-d), var(--brand)); -webkit-background-clip:text; background-clip:text; color:transparent; transition:font-size .2s; }
+  header h1 .psub { font-size:19px; font-weight:800; color:var(--sub); }
+  header.titled.compact > .hlogo { width:66px; height:66px; }
+  header.titled.compact h1 .pname { font-size:27px; }
+  header.titled.compact > .progbar { display:none; }
+  html.printing header.titled { display:block; }
+  html.printing header h1 .pname { color:#000; background:none; font-size:22px; }
   @media print { .progsw { display:none !important; } }
   /* 프로그램 업데이트 (관리 메뉴 맨 아래) */
   .updbox { border-top:1px solid var(--line); margin-top:6px; padding:10px 8px 4px; min-width:270px; }
