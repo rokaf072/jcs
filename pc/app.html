@@ -50,7 +50,7 @@
   /* C안: 밝은 흰 메뉴 + 큰 색 타일 버튼 */
   header { background:var(--head); color:var(--ink); padding:12px 24px 10px; border-bottom:1px solid var(--line); box-shadow:0 4px 14px rgba(20,60,50,.08); position:sticky; top:0; z-index:20; }
   .hrow1 { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-  .hlogo { width:38px; height:38px; border-radius:10px; }
+  .hlogo { width:58px; height:58px; border-radius:15px; flex:none; box-shadow:0 0 0 2px var(--brand), 0 6px 18px rgba(0,0,0,.35); }   /* 프로그램 로고: 크게, 눈에 띄게 */
   header h1 { font-size:21px; margin:0; font-weight:800; letter-spacing:-.3px; color:var(--brand-d); }
   header .date { font:inherit; font-size:20px; font-weight:800; color:var(--brand-d); background:var(--soft2); padding:4px 14px; border-radius:20px; border:1px solid var(--line); cursor:pointer; }
   header .date::after { content:' 📅'; font-size:16px; }
@@ -495,7 +495,7 @@
 <body>
 <header>
   <div class="hrow1">
-    <img class="hlogo" src="icons/icon48.png" alt="">
+    <img class="hlogo" src="icons/icon128.png" alt="">
     <h1>김태현의 정치쇼 출연자</h1>
     <button class="date" id="dateLabel" title="달력에서 날짜 고르기"></button>
     <span class="spacer"></span>

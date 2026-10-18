@@ -155,14 +155,15 @@ function progTheme() {
   for (const st of document.querySelectorAll('style')) { let t = st.textContent; for (const [a, b] of JYJ_COLORS) t = t.replace(a, b); st.textContent = t; }
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = '#1f56b8';
   const fav = document.querySelector('link[rel="icon"]'); if (fav) fav.href = 'icons/jyj48.png';
-  const logo = document.querySelector('header .hlogo'); if (logo) { logo.src = 'icons/jyj48.png'; logo.style.borderRadius = '50%'; }
+  const logo = document.querySelector('header .hlogo'); if (logo) { logo.src = 'icons/jyj128.png'; logo.style.borderRadius = '50%'; }
 }
 // 휴대폰: 제목 대신 단추가 있으니 왼쪽에 프로그램 로고
 function progPhoneLogo() {
   const sw = document.querySelector('.row1 .progsw');
   if (!sw || document.querySelector('.proglogo')) return;
   const im = document.createElement('img'); im.className = 'proglogo'; im.alt = '';
-  im.src = PROG.id === 'jyj' ? 'icons/jyj48.png' : 'icons/icon192.png';
+  im.src = PROG.id === 'jyj' ? 'icons/jyj128.png' : 'icons/icon192.png';
+  if (PROG.id === 'jyj') im.style.borderRadius = '50%';
   sw.insertAdjacentElement('beforebegin', im);
 }
 progTheme();
