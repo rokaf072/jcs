@@ -486,13 +486,22 @@
   .progsw button.on .swtag { background:rgba(255,255,255,.25); color:var(--card); }
   .progsw button:not(.on) .swtag { background:var(--soft2); color:var(--brand-d); border:1px solid var(--brand); }
   .progsw button:not(.on):hover .swtag { background:var(--brand); color:var(--card); }
+  /* 다른 프로그램 단추: 광택이 왼쪽→오른쪽으로 스윽 지나감 (누르는 곳이라는 표시) */
+  .progsw button:not(.on) { overflow:hidden; }
+  .progsw button:not(.on)::after { content:''; position:absolute; top:0; bottom:0; left:-60%; width:45%; pointer-events:none;
+    background:linear-gradient(105deg, transparent 0%, rgba(255,255,255,.08) 30%, rgba(255,255,255,.38) 50%, rgba(255,255,255,.08) 70%, transparent 100%);
+    transform:skewX(-18deg); animation:swshine 3.2s ease-in-out infinite; }
+  @keyframes swshine { 0% { left:-60%; } 45% { left:125%; } 100% { left:125%; } }
+  @media (prefers-reduced-motion: reduce) { .progsw button:not(.on)::after { animation:none; display:none; } }
   html.printing .progsw, html.printing .progbar { display:none !important; }
   /* 타이틀: 왼쪽 큰 동그란 로고 + 큰 프로그램 이름 (내리면 작아짐) */
   header.titled { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:22px; align-items:center; padding-top:8px; }
   header.titled > .progbar { grid-column:1 / -1; }
-  header.titled > .hlogo { grid-column:1; grid-row:2 / span 2; align-self:center; width:122px; height:122px; border-radius:50%;
+  header.titled > .hlogo { grid-column:1; grid-row:2; align-self:center; width:122px; height:122px; border-radius:50%;
     box-shadow:0 0 0 3px var(--brand), 0 0 0 9px rgba(79,209,181,.14), 0 12px 30px rgba(0,0,0,.45); transition:width .2s, height .2s; }
-  header.titled > .hrow1, header.titled > .hrow2 { grid-column:2; min-width:0; }
+  header.titled > .hrow1 { grid-column:2; grid-row:2; min-width:0; min-height:122px; align-self:center; }   /* 타이틀을 로고 옆 한가운데에 */
+  header.titled > .hrow2 { grid-column:1 / -1; grid-row:3; min-width:0; margin-top:10px; }
+  header.titled.compact > .hrow1 { min-height:66px; }
   header.titled > :not(.progbar):not(.hlogo):not(.hrow1):not(.hrow2) { grid-column:1 / -1; }
   header h1 { display:flex; align-items:baseline; gap:10px; white-space:nowrap; }
   header h1 .pname { font-size:40px; font-weight:900; letter-spacing:-1.2px; line-height:1.1;

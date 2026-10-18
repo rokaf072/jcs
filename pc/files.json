@@ -1,9 +1,9 @@
 {
-"version": "3.41.1",
+"version": "3.41.2",
 "files": [
 {
 "p": "app.html",
-"h": "e200deeb145a9bc3405c5de082278a8d5edcfa41"
+"h": "9e2e8c4ce272e97142b5a03e2b9cc25f6642f11c"
 },
 {
 "p": "app.js",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "4e2a144dcf86944777eea19c6f6a79295c650b24"
+"h": "6ef192ec40e47527c22eb56bf7972d1b020edae7"
 },
 {
 "p": "news.js",
