@@ -1,0 +1,186 @@
+{
+"version": "3.38.0",
+"files": [
+{
+"p": "app.html",
+"h": "5173c1a6c56f085fadc8bb6b7ed5560d1897c157"
+},
+{
+"p": "app.js",
+"h": "6112c20a48eed23bf6ff1821c2c8769662f0d5ef"
+},
+{
+"p": "app.webmanifest",
+"h": "20ac5664dcacf0ff2238967397f0506f02dd87b7"
+},
+{
+"p": "background.js",
+"h": "7891aafc3f0d3a34c38846a037f71735eafbf53e"
+},
+{
+"p": "bg-timer.js",
+"h": "657181f35dbd1e1072156e79c2eaae14f670ea05"
+},
+{
+"p": "canvas-fix.js",
+"h": "12cf13d4c482b8098daa425e085d51439c255faa"
+},
+{
+"p": "gate.js",
+"h": "1ca91caa9391abe53106df91e7348b85b1be8ae2"
+},
+{
+"p": "glossary.js",
+"h": "3be2a23a48aa4da6497b456cc7a7517ffe628053"
+},
+{
+"p": "hanja.js",
+"h": "f7adbe700c673b326a74dfdeba18d38ae7209b99"
+},
+{
+"p": "jcs-host.bat",
+"h": "b1b70b1dbf331112d9fa167cfc43605e2ced8540"
+},
+{
+"p": "jcs-update.ps1",
+"h": "9429f1f06fe0a255faf02861e09bd781ef18b606"
+},
+{
+"p": "manifest.json",
+"h": "2c431360df473735ce876c8fdb87455c8fbe086f"
+},
+{
+"p": "news.js",
+"h": "4dad80aa2fa8fb75626f565fccbb3f88fa6c5bfc"
+},
+{
+"p": "parser.js",
+"h": "0de76d4cd3ac3928d8a1cd8be1ee3c75cd1281f4"
+},
+{
+"p": "programs.js",
+"h": "d1508732aa51a988b633c2045483111dbc67ced8"
+},
+{
+"p": "rails.js",
+"h": "af43e1769755dec21d0d9c2a50ca5a7b0f120e5a"
+},
+{
+"p": "theme.js",
+"h": "455d7d5a3c8ba09ca16efca2bd830f241c7ac715"
+},
+{
+"p": "update.js",
+"h": "a823d565c0249cb267b8571b0823e960d8e027c6"
+},
+{
+"p": "weather.js",
+"h": "1e9c66f40b3a407f89d9284af63970b75ecd9312"
+},
+{
+"p": "web-shim.js",
+"h": "fa3f8f053929201a445fdcc8ed6ee6bae052f195"
+},
+{
+"p": "zoom.js",
+"h": "a7a5138cb092d60f3c9a0b2330ac0229eccaf662"
+},
+{
+"p": "바탕화면 바로가기 만들기.bat",
+"h": "3965e6dab4d269c66cda8ef8263c48074f34649c"
+},
+{
+"p": "새 버전 적용하기.bat",
+"h": "9d4f3924dea476daa9ea1b51233338f8dbaa1fa3"
+},
+{
+"p": "업데이트 기능 켜기.bat",
+"h": "f2cc653daa39536ec2bcc09640186157e7f27b30"
+},
+{
+"p": "icons/icon128.png",
+"h": "b508be92d6849593c11a76722fb48a2417f3d76d"
+},
+{
+"p": "icons/icon16.png",
+"h": "90a968e4ac89f7d1812086118670ca561a815200"
+},
+{
+"p": "icons/icon192.png",
+"h": "214d1e1e504734ab5c6aff1fde9fee9369a3203d"
+},
+{
+"p": "icons/icon32.png",
+"h": "6a00238e9ba11eb7643c3ec2d8561e0b2a1872dc"
+},
+{
+"p": "icons/icon48.png",
+"h": "86b3f7a4086bee82e8bc252acab002a41748a3ea"
+},
+{
+"p": "icons/icon512.png",
+"h": "e6551c89e6f085eff95adf4fc0a2f56bd8bd413c"
+},
+{
+"p": "icons/jcs.ico",
+"h": "e89e9b9c43c1f2177a41fb08635882a2a445c9c6"
+},
+{
+"p": "fonts/Galmuri11-Bold.woff2",
+"h": "04bce5f68add85d453a665d26bca9408fd80be13"
+},
+{
+"p": "fonts/NanumSquareRoundB.woff2",
+"h": "178b55b60be99ee53c3a81ff4d0745e8968331f5"
+},
+{
+"p": "fonts/NanumSquareRoundR.woff2",
+"h": "c08e6d861894074279dc1cba5da8e16dfa50e44b"
+},
+{
+"p": "lib/face-api.LICENSE",
+"h": "d38729c28566f1e785fb199107e0d23d9bc3f5b3"
+},
+{
+"p": "lib/face-api.js",
+"h": "f5833d5b1b10e9537f272c98ecb802521b6d38f7"
+},
+{
+"p": "lib/model/face_landmark_68_model-weights_manifest.json",
+"h": "60edc9f737cd206bd79afed60b5f3e6d7822a961"
+},
+{
+"p": "lib/model/face_landmark_68_model.bin",
+"h": "e8b453a3ce2a66e6fa070d4e30cd4e91c911964b"
+},
+{
+"p": "lib/model/face_landmark_68_tiny_model-weights_manifest.json",
+"h": "ba238e2dc710e4ce1d22ee318e7b7c317cd68eb2"
+},
+{
+"p": "lib/model/face_landmark_68_tiny_model.bin",
+"h": "3bfc170344e9c751a2151df215a2b4ffcfd6ee75"
+},
+{
+"p": "lib/model/face_recognition_model-weights_manifest.json",
+"h": "8d8a8bc035f61c4c86863a9194d1a1d6b2741506"
+},
+{
+"p": "lib/model/face_recognition_model.bin",
+"h": "58045dc072cf13ec6ba795e9bf63eaec4d0d955d"
+},
+{
+"p": "lib/model/tiny_face_detector_model-weights_manifest.json",
+"h": "d5f16f4b7dce062ec45a0531e9f643c285553c22"
+},
+{
+"p": "lib/model/tiny_face_detector_model.bin",
+"h": "f3020debaf078347b5caaff4bf6dce2f379d20bc"
+}
+],
+"remove": [
+"jcs-update.vbs",
+"자동 업데이트 켜기.bat",
+"지금 업데이트 확인.bat"
+]
+}

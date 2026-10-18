@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "정치쇼 출연자 보드",
+  "version": "3.38.0",
+  "description": "김태현의 정치쇼 방송내용 게시판에서 그날 출연자를 뽑아 사진과 함께 정리합니다.",
+  "action": {
+    "default_title": "정치쇼 출연자 보기",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "history",
+    "geolocation",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://api.board.sbs.co.kr/*",
+    "https://programs.sbs.co.kr/*",
+    "https://m.programs.sbs.co.kr/*",
+    "https://search.naver.com/*",
+    "https://dapi.kakao.com/*",
+    "https://*.pstatic.net/*",
+    "https://*.kakaocdn.net/*",
+    "https://*.daumcdn.net/*",
+    "https://www.google.com/*",
+    "https://*.gstatic.com/*",
+    "https://api.github.com/*",
+    "https://www.youtube.com/*",
+    "https://i.ytimg.com/*",
+    "https://www.chosun.com/*",
+    "https://www.joongang.co.kr/*",
+    "https://www.hankyung.com/*",
+    "https://www.mediatoday.co.kr/*",
+    "https://news.google.com/*",
+    "https://rokaf072.github.io/*",
+    "https://*.chosun.com/*",
+    "https://*.joongang.co.kr/*",
+    "https://*.hankyung.com/*",
+    "https://*.mediatoday.co.kr/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.open-meteo.com/*",
+    "https://air-quality-api.open-meteo.com/*",
+    "https://api.bigdatacloud.net/*",
+    "https://geocoding-api.open-meteo.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyjTa8YfrwoV4IVvbP50ttUeT+zmrnc2eEMkGYsVGJPRfXXOhx/n85mm7bqGmEHKuTAj770WzaD2nabZQpO+CzzDH9HoDnpZWhRxInrIOecz6jP21nRCif+Yq10TWisRQaFJFTDDvK959iwPwOX9S8SzNzznAEAgS51VXK2DaD3Cqz1j1krMwXDkQjFio2FTAeV2L26G5BmjYWxRs722vDkks4OMUnshZXVc+hpr3OC6Wca8cELkeYFbWTmvdosh4lW4HhYj9KXnPz5cFy+ppD5lujGwdg5TISSXmjS6CYb1k5vSeN0YNrKxe5tHmnef+vLKnIuGXpoelOWv0PW31JQIDAQAB",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "app.html"
+      ],
+      "matches": [
+        "https://rokaf072.github.io/*"
+      ]
+    }
+  ]
+}
