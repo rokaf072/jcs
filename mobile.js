@@ -340,9 +340,22 @@ function render(post) {
 function fillSelect(selected) {
   const sel = $('#dateSel'); sel.textContent = '';
   const today = todayStr();
-  if (!posts.some((p) => p.date === today)) { const o = el('option', null, prettyDate(today) + ' · 오늘 (아직 안 올라옴)'); o.value = today; sel.append(o); }
+  if (!posts.some((p) => p.date === today)) { const o = el('option', null, prettyDate(today) + ' · 오늘'); o.value = today; sel.append(o); }
   for (const p of posts) { const o = el('option', null, prettyDate(p.date) + (p.date === today ? ' · 오늘' : '')); o.value = p.date; sel.append(o); }
   sel.value = selected || today;
+  dnavState();
+}
+// ◀ ▶ : 글이 있는 날짜끼리 하루씩 이동 (목록은 최신이 위)
+function dnavState() {
+  const sel = $('#dateSel'), i = sel.selectedIndex, n = sel.options.length;
+  $('#dPrev').disabled = i < 0 || i >= n - 1; $('#dNext').disabled = i <= 0;
+}
+async function stepDay(dir) {   // dir -1 = 전날, +1 = 다음날
+  const sel = $('#dateSel'), i = sel.selectedIndex - dir;
+  if (i < 0 || i >= sel.options.length) return false;
+  sel.selectedIndex = i; dnavState();
+  const m = $('#main'); m.classList.remove('swl', 'swr'); void m.offsetWidth; m.classList.add(dir > 0 ? 'swl' : 'swr');
+  await show(sel.value); window.scrollTo(0, 0); saveView(); return true;
 }
 function waitingMessage(date) {
   const dow = new Date(date + 'T00:00:00').getDay();
@@ -424,9 +437,28 @@ async function init(force = false) {
     saveView();
   } catch (e) { status(e.message, true); }
 }
-$('#dateSel').onchange = async (e) => { await show(e.target.value); window.scrollTo(0, 0); saveView(); };
+$('#dateSel').onchange = async (e) => { dnavState(); await show(e.target.value); window.scrollTo(0, 0); saveView(); };
+$('#dPrev').onclick = () => stepDay(-1);
+$('#dNext').onclick = () => stepDay(1);
+// 화면을 옆으로 쓸어도 날짜 이동 (오른쪽→왼쪽 = 다음날, 왼쪽→오른쪽 = 전날)
+(() => {
+  let sx = 0, sy = 0, st = 0, ok = false;
+  const main = $('#main');
+  main.addEventListener('touchstart', (e) => {
+    const t = e.touches[0]; ok = e.touches.length === 1;
+    for (let n = e.target; ok && n && n !== main; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) ok = false;
+    sx = t.clientX; sy = t.clientY; st = Date.now();
+  }, { passive: true });
+  main.addEventListener('touchend', (e) => {
+    if (!ok) return; ok = false;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Date.now() - st > 700 || Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (document.querySelector('.zoomov, .nov, .picker')) return;
+    stepDay(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
 $('#refresh').onclick = () => init(true);
-$('#today').onclick = async () => { fillSelect(todayStr()); await show(todayStr()); window.scrollTo(0, 0); saveView(); };
+$('#today').onclick = async () => { const m = $('#main'); m.classList.remove('swl', 'swr'); fillSelect(todayStr()); await show(todayStr()); window.scrollTo(0, 0); saveView(); };
 $('#openPost').onclick = () => window.open(current && current.url ? current.url : LIST_URL, '_blank');
 // ───────── 설정: 카카오 키 / 사진 백업 / 사진 복원 ─────────
 

@@ -43,6 +43,17 @@
   .row2 { display:flex; gap:8px; margin-top:8px; }
   select, button { font:inherit; font-size:15px; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.7); background:var(--card); color:var(--ink); }
   .row2 select { flex:1; min-width:0; }
+  .row2 { gap:6px; }
+  .statrow { display:flex; align-items:center; gap:8px; padding-right:12px; } .statrow #status { flex:1; min-width:0; }
+  .statrow #openPost { flex:0 0 auto; font-size:13px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--soft); color:var(--sub); border:1px solid var(--line); }
+  @media (max-width:400px) { .progsw button { font-size:13.5px; padding:7px 4px; } .row1 .icon-btn { padding:4px 3px; font-size:19px; } }
+  .row2 .dnav { flex:0 0 38px; padding:8px 0; text-align:center; font-size:15px; line-height:1; }
+  .row2 #dPrev, .row2 #dNext { color:#2dd4bf; }
+  .row2 #refresh { font-size:19px; font-weight:800; }
+  .row2 .dnav:disabled { opacity:.3; }
+  .row2 #today { flex:0 0 auto; padding:8px 12px; }
+  #main.swl { animation:swl .22s ease-out; } #main.swr { animation:swr .22s ease-out; }
+  @keyframes swl { from { transform:translateX(40px); opacity:.3; } } @keyframes swr { from { transform:translateX(-40px); opacity:.3; } }
   .icon-btn { background:transparent; color:#fff; border:none; font-size:20px; padding:4px 6px; }
   #status { padding:6px 14px; font-size:12.5px; color:var(--sub); min-height:18px; }
   #status.err { color:#b3261e; font-weight:600; }
@@ -375,13 +386,14 @@
     <button class="icon-btn" id="settings" title="설정">⚙</button>
   </div>
   <div class="row2">
+    <button class="dnav" id="dPrev" title="전날">◀</button>
     <select id="dateSel"></select>
+    <button class="dnav" id="dNext" title="다음날">▶</button>
     <button id="today">오늘</button>
-    <button id="refresh">새로고침</button>
-    <button id="openPost">원문</button>
+    <button class="dnav" id="refresh" title="새로고침">↻</button>
   </div>
 </header>
-<div id="status"></div>
+<div class="statrow"><div id="status"></div><button id="openPost" title="게시판 원문 보기">원문 ↗</button></div>
 <main id="main"></main>
 <section id="news" class="news"></section>
 <script src="canvas-fix.js"></script>
