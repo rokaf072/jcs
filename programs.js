@@ -158,7 +158,10 @@ function progHeader() {
     const logo = header.querySelector('.hlogo');
     if (logo) { logo.src = PROG.logo; bar.insertAdjacentElement('afterend', logo); }
     header.classList.add('titled');
-    const fit = () => header.classList.toggle('compact', window.scrollY > 60);   // 내리면 로고·타이틀을 작게
+    // 내리면 로고·타이틀을 작게. 머리글 높이가 바뀌면 화면이 위아래로 밀려 다시 커졌다 작아졌다 떨리지 않게:
+    // 작아지는 지점(160)과 다시 커지는 지점(30)을 멀리 떨어뜨림 + 브라우저의 자동 위치 보정 끔
+    document.documentElement.style.overflowAnchor = 'none'; document.body.style.overflowAnchor = 'none';
+    const fit = () => { const y = window.scrollY, c = header.classList.contains('compact'); if (!c && y > 160) header.classList.add('compact'); else if (c && y < 30) header.classList.remove('compact'); };
     window.addEventListener('scroll', fit, { passive: true }); fit();
   } else if (h1) h1.insertAdjacentElement('afterend', sw);
   else if (header) header.prepend(sw);
