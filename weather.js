@@ -87,17 +87,42 @@
   const ls = { get: (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
   const km = (a, b) => { const r = Math.PI / 180, x = (b[1] - a[1]) * r * Math.cos(((a[0] + b[0]) / 2) * r), y = (b[0] - a[0]) * r; return Math.hypot(x, y) * 6371; };
   const mode = () => ls.get('jcsWxMode') || 'here';
-  function position() {
+  // maxAgeMin: 이 시간 안에 확인한 위치면 그대로 씀 (앱 열 때·새로고침 1분, 화면 돌아올 때 10분, 켜 둔 동안은 다시 확인 안 함)
+  // PC처럼 GPS가 없어 위치가 부정확(3km 넘게 오차)하면 쓰지 않음 → 직접 정한 동네 또는 목동
+  function position(maxAgeMin = 1e9) {
+    const fixed = ls.get('jcsWxPlace');
+    if (fixed) return Promise.resolve(fixed);
     const c = ls.get('jcsGeo');
-    if (c && Date.now() - c.at < 30 * 60e3) return Promise.resolve(c);
-    if (!navigator.geolocation) return Promise.resolve(c);
+    if (c && Date.now() - c.at < maxAgeMin * 60e3) return Promise.resolve(c.bad ? null : c);
+    if (!navigator.geolocation) return Promise.resolve(c && !c.bad ? c : null);
     return new Promise((ok) => {
       navigator.geolocation.getCurrentPosition(async (p) => {
-        const g = { lat: +p.coords.latitude.toFixed(4), lon: +p.coords.longitude.toFixed(4), at: Date.now() };
-        g.place = c && c.place && km([c.lat, c.lon], [g.lat, g.lon]) < 1 ? c.place : await placeName(g.lat, g.lon);
+        const g = { lat: +p.coords.latitude.toFixed(4), lon: +p.coords.longitude.toFixed(4), acc: Math.round(p.coords.accuracy || 0), at: Date.now() };
+        if (g.acc > 3000) { g.bad = true; ls.set('jcsGeo', g); ok(null); return; }   // 인터넷 주소로 짐작한 위치(엉뚱한 동네가 나옴)
+        g.place = c && c.place && !c.bad && km([c.lat, c.lon], [g.lat, g.lon]) < 1 ? c.place : await placeName(g.lat, g.lon);
         ls.set('jcsGeo', g); ok(g);
-      }, () => ok(c), { timeout: 10000, maximumAge: 20 * 60e3, enableHighAccuracy: false });
+      }, () => ok(c && !c.bad ? c : null), { timeout: 10000, maximumAge: Math.min(maxAgeMin, 10) * 60e3, enableHighAccuracy: false });
     });
+  }
+  // 동네 이름 → 좌표 (PC에서 직접 정할 때)
+  async function geocode(q) {
+    const key = typeof KAKAO_REST_KEY !== 'undefined' ? KAKAO_REST_KEY : '';
+    if (key) {
+      try {
+        const r = await fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q), { headers: { Authorization: 'KakaoAK ' + key } });
+        const d = ((await r.json()).documents || [])[0];
+        if (d) return { lat: +(+d.y).toFixed(4), lon: +(+d.x).toFixed(4), place: q.split(/\s+/).pop() };
+        const r2 = await fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(q), { headers: { Authorization: 'KakaoAK ' + key } });
+        const d2 = ((await r2.json()).documents || [])[0];
+        if (d2) return { lat: +(+d2.y).toFixed(4), lon: +(+d2.x).toFixed(4), place: q.split(/\s+/).pop() };
+      } catch (e) {}
+    }
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.split(/\s+/).pop())}&count=1&language=ko&countryCode=KR`);
+      const d = ((await r.json()).results || [])[0];
+      if (d) return { lat: +d.latitude.toFixed(4), lon: +d.longitude.toFixed(4), place: q.split(/\s+/).pop() };
+    } catch (e) {}
+    return null;
   }
   async function placeName(lat, lon) {
     try {
@@ -158,21 +183,39 @@
       return Date.now() - w.at > 6 * 3600e3 ? null : w;   // 6시간 넘은 자료는 안 보여줌
     } catch (e) { return null; }
   }
-  async function load() {
+  async function load(maxAgeMin = 1e9) {
     const base = await mokdong();
     let w = base;
-    if (mode() === 'here' && window.jcsIsMember && !window.jcsIsMember()) { if (base) render(base); setTimeout(load, 15000); return; }   // 가입 전엔 위치를 묻지 않음
+    if (mode() === 'here' && window.jcsIsMember && !window.jcsIsMember()) { if (base) render(base); setTimeout(() => load(1), 15000); return; }   // 가입 전엔 위치를 묻지 않음
     if (mode() === 'here') {
-      const g = await position().catch(() => null);
+      const g = await position(maxAgeMin).catch(() => null);
       if (g && km([g.lat, g.lon], MOK) > 3) w = (await here(g, base).catch(() => null)) || base;
     }
-    if (w) { render(w); if (box) box.title = (w.here ? `${w.place} 날씨 (Open-Meteo) · 누르면 목동(SBS) 날씨로` : `목동(SBS) 날씨 · 기상청·에어코리아${mode() === 'here' ? ' (지금 목동 근처예요)' : ' · 누르면 현위치 날씨로'}`); }
+    if (!w) return;
+    render(w);
+    const bad = (ls.get('jcsGeo') || {}).bad && !ls.get('jcsWxPlace');
+    if (box) box.title = w.here ? `${w.place} 날씨 (Open-Meteo) · 누르면 ${ls.get('jcsWxPlace') ? '동네 바꾸기' : '목동(SBS) 날씨로'}`
+      : bad ? '목동(SBS) 날씨 · 이 기기는 위치를 정확히 몰라요. 누르면 동네를 직접 정할 수 있어요'
+      : `목동(SBS) 날씨 · 기상청·에어코리아${mode() === 'here' ? ' (지금 목동 근처예요)' : ' · 누르면 현위치 날씨로'}`;
   }
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', async (e) => {
     if (!box || !box.contains(e.target)) return;
-    ls.set('jcsWxMode', mode() === 'here' ? 'mok' : 'here'); lastKey = ''; load();
+    const bad = (ls.get('jcsGeo') || {}).bad, fixed = ls.get('jcsWxPlace');
+    if (bad || fixed) {   // GPS 없는 PC: 동네를 직접 정함
+      const q = prompt('이 기기는 위치를 정확히 알 수 없어요.\n날씨를 볼 동네를 적어 주세요. (예: 김포 고촌읍)\n비우고 확인하면 목동(SBS) 날씨로 돌아가요.', fixed ? fixed.place : '');
+      if (q === null) return;
+      if (!q.trim()) { localStorage.removeItem('jcsWxPlace'); ls.set('jcsWxMode', 'here'); }
+      else {
+        const g = await geocode(q.trim());
+        if (!g) { alert('그 동네를 찾지 못했어요. "김포 고촌읍"처럼 시·읍·동 이름으로 적어 주세요.'); return; }
+        ls.set('jcsWxPlace', { ...g, at: Date.now() }); ls.set('jcsWxMode', 'here');
+      }
+    } else ls.set('jcsWxMode', mode() === 'here' ? 'mok' : 'here');
+    lastKey = ''; load(1);
   });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load); else load();
-  setInterval(load, 10 * 60e3);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+  // 새로고침(당겨서·F5·[새로고침] 단추)·앱을 새로 열 때는 위치를 새로 확인
+  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('#refresh')) load(1); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => load(1)); else load(1);
+  setInterval(() => load(1e9), 10 * 60e3);   // 켜 둔 동안은 위치는 다시 묻지 않고 날씨만 새로 받음
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(10); });
 })();
