@@ -35,24 +35,34 @@ function parseRSS(xml, paper, src) {
     return { paper, title, link: strip(tag(it, 'link')), desc: desc.slice(0, 140), t };
   }).filter((x) => x.title && x.link && !isForeign(x) && (!x.t || Date.now() - x.t < MAX_AGE));
 }
+const FEEDLOG = {};   // 신문사 RSS 상태 기록 (news.json의 diag.feeds 로 남김 → 안 나올 때 원인 확인용)
 async function getText(url, opt = {}) {
   try {
-    const r = await fetch(url, { ...opt, headers: { 'User-Agent': UA, 'Accept-Language': 'ko-KR,ko;q=0.9', ...(opt.headers || {}) }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    const r = await fetch(url, { ...opt, headers: { 'User-Agent': UA, 'Accept-Language': 'ko-KR,ko;q=0.9', 'Accept': 'application/rss+xml, application/xml, text/xml, text/html, */*', ...(opt.headers || {}) }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    if (opt.log) FEEDLOG[url] = { st: r.status, to: r.url !== url ? r.url : undefined, ct: (r.headers.get('content-type') || '').slice(0, 40) };
     if (!r.ok) return '';
     const buf = Buffer.from(await r.arrayBuffer());
     const ct = (r.headers.get('content-type') || '').toLowerCase();
     let txt = buf.toString('utf8');
     if (/euc-kr|ks_c_5601/.test(ct) || /charset=["']?(euc-kr|ks_c_5601)/i.test(txt.slice(0, 2000))) txt = new TextDecoder('euc-kr').decode(buf);
     return txt;
-  } catch (e) { return ''; }
+  } catch (e) { if (opt.log) FEEDLOG[url] = { err: String(e.message || e).slice(0, 60) }; return ''; }
 }
+const rssLoad = (u, p) => getText(u, { log: true }).then((x) => {
+  const items = parseRSS(x, p.name, 'rss'), all = (x.match(/<item[\s>]/g) || []).length;
+  if (FEEDLOG[u]) Object.assign(FEEDLOG[u], { bytes: x.length, items: all, fresh: items.length, head: all ? undefined : x.slice(0, 80).replace(/\s+/g, ' ') });
+  return items;
+});
 async function loadPaper(p) {
-  const jobs = p.feeds.map((u) => getText(u).then((x) => parseRSS(x, p.name, 'rss')));
+  const rss = await Promise.all([...p.feeds, ...(p.eco || [])].map((u) => rssLoad(u, p).then((items) => ({ u, items }))));
+  const rssOf = (u) => (rss.find((r) => r.u === u) || { items: [] }).items;
+  const rssEmpty = p.feeds.length && p.feeds.every((u) => !rssOf(u).length);   // 신문사 RSS가 막히거나 비었을 때 → 구글 뉴스로 대신
+  const jobs = p.feeds.map((u) => Promise.resolve(rssOf(u)));
   jobs.push(getText(GN(`site:${p.site} SBS when:3d`)).then((x) => parseRSS(x, p.name, 'gn').map((i) => ({ ...i, sbsQ: true }))));
   jobs.push(getText(GN(`site:${p.site} 방송 when:1d`)).then((x) => parseRSS(x, p.name, 'gn')));
-  if (!p.feeds.length || p.name === '중앙일보') jobs.push(getText(GN(`site:${p.site} 정치 when:1d`)).then((x) => parseRSS(x, p.name, 'gn')));
+  if (!p.feeds.length || p.name === '중앙일보' || rssEmpty) jobs.push(getText(GN(`site:${p.site} 정치 when:1d`)).then((x) => parseRSS(x, p.name, 'gn')));
   // 경제 기사 (한국경제): 경제·금융 RSS + 구글 뉴스 보조
-  for (const u of p.eco || []) jobs.push(getText(u).then((x) => parseRSS(x, p.name, 'rss').map((i) => ({ ...i, eco: true }))));
+  for (const u of p.eco || []) jobs.push(Promise.resolve(rssOf(u).map((i) => ({ ...i, eco: true }))));
   if (p.eco) jobs.push(getText(GN(`site:${p.site}/economy when:1d`)).then((x) => parseRSS(x, p.name, 'gn').map((i) => ({ ...i, eco: true }))));
   const all = (await Promise.all(jobs)).flat();
   const seen = new Map(), out = [];
@@ -199,5 +209,6 @@ await Promise.all(Array.from({ length: 6 }, async () => {
 }));
 for (const i of items) { const s = prev[keyOf(i.title)]; if (s) Object.assign(i, s); }
 diag.withSum = items.filter((i) => i.sum).length;
+diag.feeds = FEEDLOG;
 console.log('기사 수', Object.fromEntries(PAPERS.map((p, n) => [p.name, lists[n].length])), '요약', diag);
 writeFileSync('news.json', JSON.stringify({ at: Date.now(), diag, items }));
