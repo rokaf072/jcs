@@ -180,7 +180,10 @@
       const r = await fetch(URL_ + '?t=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) return null;
       const w = await r.json();
-      return Date.now() - w.at > 6 * 3600e3 ? null : w;   // 6시간 넘은 자료는 안 보여줌
+      const good = w && (w.now || w.today) && Date.now() - w.at < 6 * 3600e3;   // 6시간 넘은 자료는 안 보여줌
+      if (good) { ls.set('jcsWxLast', w); return w; }
+      const last = ls.get('jcsWxLast');   // 기상청이 잠깐 비었으면 직전에 받은 날씨를 그대로 (3시간까지)
+      return last && Date.now() - last.at < 3 * 3600e3 ? last : null;
     } catch (e) { return null; }
   }
   async function load(maxAgeMin = 1e9) {

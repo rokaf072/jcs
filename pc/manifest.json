@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "정치쇼 출연자 보드",
-  "version": "3.39.0",
+  "version": "3.39.1",
   "description": "김태현의 정치쇼 방송내용 게시판에서 그날 출연자를 뽑아 사진과 함께 정리합니다.",
   "action": {
     "default_title": "정치쇼 출연자 보기",

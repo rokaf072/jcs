@@ -1,6 +1,6 @@
 // GitHub가 신문과 함께 15분마다 실행: SBS(목동) 날씨를 기상청·에어코리아에서 받아 weather.json 으로 저장
 // 키는 GitHub 비밀 설정(KMA_KEY)에만 있음 → 폰·PC에는 키가 나가지 않음
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 
 const KEY = process.env.KMA_KEY || '';
 const NX = 58, NY = 126;          // 기상청 격자: 서울 양천구 목동 (SBS 목동 사옥)
@@ -108,5 +108,17 @@ const out = { at: Date.now(), place: '목동', ok: {} };
   out.warns = [...new Set(warns)];
 }
 
+// 기상청이 잠깐 응답을 안 하면(가끔 있음) 빈 날씨가 저장돼 전광판이 사라짐 → 3시간 안의 직전 값을 그대로 이어 씀
+{
+  let prev = {};
+  try { if (existsSync('weather.json')) prev = JSON.parse(readFileSync('weather.json', 'utf8')); } catch (e) {}
+  const got = prev.got || {};
+  out.got = {};
+  for (const k of ['now', 'today', 'tomorrow', 'tomorrowMorning', 'air']) {
+    if (out[k] != null) out.got[k] = out.at;
+    else if (prev[k] != null && Date.now() - (got[k] || prev.at || 0) < 3 * 3600e3) { out[k] = prev[k]; out.got[k] = got[k] || prev.at; }
+  }
+  if (!out.ok.warn && prev.warns) out.warns = prev.warns;
+}
 writeFileSync('weather.json', JSON.stringify(out));
 console.log('날씨 저장', JSON.stringify(out.ok), out.now ? out.now.t + '°' : '');
