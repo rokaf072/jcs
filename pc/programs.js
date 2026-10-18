@@ -141,4 +141,30 @@ function progHeader() {
   else { const hd = document.querySelector('header'); if (hd) hd.prepend(sw); }
   document.documentElement.dataset.prog = PROG.id;
 }
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', progHeader); else progHeader();
+// 뉴스직격: 상징색 파랑으로 화면 색 바꾸기 + 뉴스직격 로고
+const JYJ_COLORS = [
+  [/#3a9a8a/gi, '#3b7be0'], [/#2a7466/gi, '#1f56b8'], [/#4fd1b5/gi, '#5b9cff'], [/#6ee7cc/gi, '#8cbcff'], [/#14b8a6/gi, '#2f7bf6'],
+  [/#9fe3d4/gi, '#a9c8ff'], [/#0b1f1b/gi, '#0a1730'], [/79,\s*209,\s*181/g, '91,156,255'], [/42,\s*116,\s*102/g, '31,86,184'],
+  [/#dcefea/gi, '#dce7fb'], [/#eef7f4/gi, '#eef3fd'], [/#e8eeec/gi, '#e8edf7'], [/#e6eeec/gi, '#e4eaf6'], [/#eef2f1/gi, '#edf1f8'],
+  [/#f6f8f7/gi, '#f6f8fc'], [/#f2f6f5/gi, '#f1f4fb'], [/#d3dedb/gi, '#d2dbec'], [/#d9e3e0/gi, '#d6deee'], [/#1b2a27/gi, '#18243a'],
+  [/#5b6b67/gi, '#5a6880'], [/#3fb39e/gi, '#4c8ef0'], [/#67e8f9/gi, '#93c5fd'], [/#2dd4bf/gi, '#60a5fa'], [/#5eead4/gi, '#93c5fd'], [/#0d9488/gi, '#1d4ed8'], [/#0f766e/gi, '#1e40af'], [/#fafbfb/gi, '#f9fbfe'],
+  [/#111419/gi, '#0a1222'], [/#1a1e25/gi, '#111b2e'], [/#232934/gi, '#1a2640'], [/#2a313c/gi, '#24324e'], [/\b17,\s*20,\s*25\b/g, '10,18,34'],
+];
+function progTheme() {
+  if (PROG.id !== 'jyj') return;
+  for (const st of document.querySelectorAll('style')) { let t = st.textContent; for (const [a, b] of JYJ_COLORS) t = t.replace(a, b); st.textContent = t; }
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = '#1f56b8';
+  const fav = document.querySelector('link[rel="icon"]'); if (fav) fav.href = 'icons/jyj48.png';
+  const logo = document.querySelector('header .hlogo'); if (logo) { logo.src = 'icons/jyj48.png'; logo.style.borderRadius = '50%'; }
+}
+// 휴대폰: 제목 대신 단추가 있으니 왼쪽에 프로그램 로고
+function progPhoneLogo() {
+  const sw = document.querySelector('.row1 .progsw');
+  if (!sw || document.querySelector('.proglogo')) return;
+  const im = document.createElement('img'); im.className = 'proglogo'; im.alt = '';
+  im.src = PROG.id === 'jyj' ? 'icons/jyj48.png' : 'icons/icon192.png';
+  sw.insertAdjacentElement('beforebegin', im);
+}
+progTheme();
+const progInit = () => { progHeader(); progPhoneLogo(); };
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', progInit); else progInit();

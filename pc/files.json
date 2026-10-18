@@ -1,5 +1,5 @@
 {
-"version": "3.39.2",
+"version": "3.40.0",
 "files": [
 {
 "p": "app.html",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "9dbdb26022cfea9db3952eeb8ffaa7b9969645d3"
+"h": "692ada36267dd26f9f1f6a642b42d38847cf80e2"
 },
 {
 "p": "news.js",
@@ -59,7 +59,7 @@
 },
 {
 "p": "programs.js",
-"h": "e356736869e477091e445774d474e40e9b817807"
+"h": "65ec63f276fd7785630f9e78fdadd3c941fa90ec"
 },
 {
 "p": "rails.js",
@@ -124,6 +124,18 @@
 {
 "p": "icons/jcs.ico",
 "h": "e89e9b9c43c1f2177a41fb08635882a2a445c9c6"
+},
+{
+"p": "icons/jyj128.png",
+"h": "1224aea21833eb544220816347d51498608b3421"
+},
+{
+"p": "icons/jyj192.png",
+"h": "ce8ad750f36ac84eedba310659ce0f54f0c130c2"
+},
+{
+"p": "icons/jyj48.png",
+"h": "51391be1f6728267c58a7d94da6d93744b4d86ef"
 },
 {
 "p": "fonts/Galmuri11-Bold.woff2",

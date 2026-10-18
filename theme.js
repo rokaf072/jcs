@@ -5,7 +5,7 @@
   var h = document.documentElement;
   function apply(v) {
     h.dataset.theme = v;
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = v === 'dark' ? '#111419' : '#3a9a8a';
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) var jyj = false; try { jyj = localStorage.getItem('jcsProg') === 'jyj'; } catch (e) {} m.content = v === 'dark' ? (jyj ? '#0a1222' : '#111419') : (jyj ? '#1f56b8' : '#3a9a8a');
     var b = document.getElementById('themeBtn'); if (b) b.textContent = v === 'dark' ? '☀' : '🌙';
   }
   apply(t);
