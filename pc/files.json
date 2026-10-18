@@ -1,5 +1,5 @@
 {
-"version": "3.40.1",
+"version": "3.40.2",
 "files": [
 {
 "p": "app.html",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "3d88564618f1eb4d1c04ca1ad10366b6f5dbee72"
+"h": "c1c1d84e9767492666bc3a6632d3062373acec11"
 },
 {
 "p": "news.js",
@@ -83,7 +83,7 @@
 },
 {
 "p": "zoom.js",
-"h": "a7a5138cb092d60f3c9a0b2330ac0229eccaf662"
+"h": "86b019c7665ddecedf46b4340b59cc4a6818b780"
 },
 {
 "p": "바탕화면 바로가기 만들기.bat",

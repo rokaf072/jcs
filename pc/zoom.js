@@ -17,12 +17,16 @@
     const role = card && card.querySelector('.grole') ? card.querySelector('.grole').textContent : '';
     ov = document.createElement('div'); ov.className = 'zoomov';
     const fig = document.createElement('figure'); fig.className = 'zoomfig';
+    // 모든 사람을 같은 크기로: 카드 사진과 같은 비율(세로형)의 큰 액자에, 카드에서 보이던 얼굴 부분 그대로 꽉 채움
+    const r = ph.getBoundingClientRect(), ar = r.width && r.height ? r.width / r.height : 0.8;
+    const H = Math.round(Math.min(window.innerHeight * 0.76, (window.innerWidth * 0.92) / ar, 820)), W = Math.round(H * ar);
     if (src.tagName === 'IMG') {
       const im = document.createElement('img'); im.referrerPolicy = 'no-referrer'; im.alt = name; im.src = src.currentSrc || src.src;
-      im.className = 'zoomimg'; fig.append(im);
+      im.className = 'zoomimg'; im.style.width = W + 'px'; im.style.height = H + 'px'; im.style.objectFit = 'cover';
+      im.style.objectPosition = getComputedStyle(src).objectPosition || '50% 25%';
+      fig.append(im);
     } else {   // 영상 장면에서 얼굴만 잘라 둔 사진: 같은 부분을 크게
-      const r = ph.getBoundingClientRect(), k = Math.min((window.innerWidth * 0.9) / r.width, (window.innerHeight * 0.72) / r.height);
-      const d = src.cloneNode(true); d.className = 'cropimg zoomcrop'; d.style.width = Math.round(r.width * k) + 'px'; d.style.height = Math.round(r.height * k) + 'px';
+      const d = src.cloneNode(true); d.className = 'cropimg zoomcrop'; d.style.width = W + 'px'; d.style.height = H + 'px';
       fig.append(d);
     }
     const cap = document.createElement('figcaption'); cap.className = 'zoomcap';
