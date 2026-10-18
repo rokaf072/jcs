@@ -605,14 +605,22 @@ function openSettings() {
   const ov = el('div', 'overlay'), box = el('div', 'picker');
   box.append(el('div', 'ptitle', '설정'));
   const row = (label, desc, fn) => { const b = el('button', 'srow'); b.append(el('b', null, label), el('span', null, desc)); b.onclick = () => { ov.remove(); fn(); }; box.append(b); return b; };
+  const pushRow = () => {
+    const b = row('🔔 알림 받기', '확인 중…', async () => { try { if (await jcsNotice.subscribe()) alert('✔ 이제 중요 알림이 이 폰으로 와요.'); } catch (e) { alert('알림을 켜지 못했어요: ' + e.message); } });
+    if (window.jcsNotice) jcsNotice.pushState().then((st) => { if (st === 'wait' && !isOwner()) { b.remove(); return; } b.lastChild.textContent = { on: '켜짐 ✔ · 앱이 꺼져 있어도 알림이 와요', off: '꺼짐 · 누르면 켜요', denied: '폰 설정에서 알림이 막혀 있어요', 'ios-home': '아이폰은 홈 화면에 추가해야 받을 수 있어요', no: '이 브라우저는 알림을 못 받아요', wait: '알림 서버 준비 중' }[st] || ''; });
+  };
   const updRow = () => { const b = row('🔄 최신 버전 확인', '확인 중…', checkAppUpdate); appVersion().then((v) => { b.lastChild.textContent = `지금 버전 ${v || '—'} · 누르면 새 버전이 있는지 확인`; }); };
   if (!isOwner()) {   // 직원 폰: 사진 새로 받기 + 관리자 로그인만
     row('사진 새로 받기', '관리자가 고른 최신 사진을 바로 가져와요', async () => { const got = await syncPull(true); if (got && current) render(current); alert(got ? `새 사진 ${got}건을 받아왔어요.` : '이미 최신이에요.'); });
+    row('📢 알림 다시 보기', '관리자가 올린 알림을 다시 띄워요', () => { if (!(window.jcsNotice && jcsNotice.again())) alert('지금 올라와 있는 알림이 없어요.'); });
+    pushRow();
     updRow();
     const close0 = el('button', 'pclose', '닫기'); close0.onclick = () => ov.remove();
     box.append(close0); ov.append(box); ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
     document.body.append(ov); return;
   }
+  row('📢 알림 보내기', '모든 직원 폰에 중요한 알림을 크게 띄워요', () => window.jcsNotice && jcsNotice.compose());
+  pushRow();
   row('👥 가입 기간·코드', '새 폰이 가입할 수 있는 기간과 코드 정하기', async () => {
     try { const r = await jcsEditAccess(store.get('ghToken')); if (r) alert(`저장했어요.\n가입 기간: ${r.from} ~ ${r.until}\n(새 폰에 적용되기까지 1~10분 걸려요)`); }
     catch (e) { alert(e.message); }

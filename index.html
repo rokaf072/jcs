@@ -324,6 +324,45 @@
   .progsw button { flex:1; border:none; background:transparent; color:var(--sub, #667); font:inherit; font-size:15px; font-weight:800; padding:7px 6px; border-radius:999px; white-space:nowrap; }
   .progsw button.on { background:var(--brand-d, #0f766e); color:var(--card, #fff); box-shadow:0 1px 3px rgba(0,0,0,.18); }
   html.printing .progsw { display:none !important; }
+  /* 알림판: 뒤를 흐리게, 알림만 크게 */
+  .ntov { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;
+    background:rgba(5,8,12,.55); backdrop-filter:blur(10px) saturate(.7); -webkit-backdrop-filter:blur(10px) saturate(.7); opacity:0; transition:opacity .2s; }
+  .ntov.on { opacity:1; }
+  .ntcard { width:100%; max-width:440px; background:var(--card); color:var(--ink); border-radius:22px; padding:22px 20px 18px; text-align:center;
+    border:2px solid var(--brand); box-shadow:0 0 0 6px rgba(79,209,181,.15), 0 24px 60px rgba(0,0,0,.55); transform:scale(.92); transition:transform .2s; }
+  .ntov.on .ntcard { transform:scale(1); }
+  .ntov.urgent .ntcard { border-color:#ff3b4e; box-shadow:0 0 0 6px rgba(255,59,78,.2), 0 24px 60px rgba(0,0,0,.55); animation:ntpulse 1.6s ease-in-out infinite; }
+  @keyframes ntpulse { 50% { box-shadow:0 0 0 12px rgba(255,59,78,.08), 0 24px 60px rgba(0,0,0,.55); } }
+  .nttop { display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:6px; }
+  .nticon { font-size:30px; }
+  .ntkind { font-size:14px; font-weight:900; letter-spacing:1px; color:var(--brand-d); }
+  .ntov.urgent .ntkind { color:#ff3b4e; }
+  .nttitle { margin:4px 0 12px; font-size:23px; font-weight:900; line-height:1.3; }
+  .ntbody { font-size:17px; line-height:1.6; white-space:pre-wrap; text-align:left; background:var(--soft); border-radius:14px; padding:14px 16px; max-height:46vh; overflow:auto; }
+  .ntmeta { font-size:12.5px; color:var(--sub); margin:10px 0 14px; }
+  .ntok { width:100%; border:none; border-radius:14px; padding:14px; font:inherit; font-size:17px; font-weight:900; background:var(--brand-d); color:var(--card); }
+  .ntov.urgent .ntok { background:#ff3b4e; color:#fff; }
+  .ntform label { display:block; font-size:14px; font-weight:800; margin:10px 0 0; }
+  .ntform input[type=text], .ntform input:not([type]), .ntform textarea, .ntform select { display:block; width:100%; margin-top:5px; font:inherit; font-size:16px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--soft); color:var(--ink); box-sizing:border-box; }
+  .ntform .ntsub { font-size:13px; color:var(--sub); margin-top:4px; }
+  .ntrow { display:flex; align-items:center; gap:10px; margin-top:12px; font-size:14px; font-weight:800; flex-wrap:wrap; }
+  .ntrow select { width:auto; margin:0; flex:1; }
+  .ntchip { display:inline-flex !important; align-items:center; gap:4px; margin:0 !important; padding:6px 10px; border:1px solid var(--line); border-radius:999px; }
+  .ntbtns { display:flex; gap:8px; margin-top:16px; }
+  .ntbtns button { flex:1; padding:12px; border-radius:12px; font:inherit; font-weight:800; border:1px solid var(--line); }
+  .ntsend { background:var(--brand-d) !important; color:var(--card) !important; border-color:transparent !important; }
+  .ntoff { background:var(--soft); color:var(--ink); }
+  .nttest { width:100%; margin-top:8px; padding:11px; border-radius:12px; font:inherit; font-weight:800; border:1px dashed var(--brand); background:transparent; color:var(--brand-d); }
+  .ntstat { font-size:13px; margin-top:10px; color:var(--sub); min-height:1em; }
+  /* 알림 받기 권유 카드 (아래쪽) */
+  .pushask { position:fixed; left:12px; right:12px; bottom:calc(14px + env(safe-area-inset-bottom)); z-index:150; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--card); border:2px solid var(--brand); border-radius:16px; padding:12px 14px; box-shadow:0 12px 32px rgba(0,0,0,.45); animation:paup .3s ease-out; }
+  @keyframes paup { from { transform:translateY(30px); opacity:0; } }
+  .pushask .pa-ico { font-size:26px; }
+  .pushask .pa-txt { flex:1; min-width:180px; display:flex; flex-direction:column; }
+  .pushask .pa-txt b { font-size:15px; } .pushask .pa-txt span { font-size:12.5px; color:var(--sub); }
+  .pushask button { border:none; border-radius:10px; padding:9px 14px; font:inherit; font-weight:800; }
+  .pushask .pa-yes { background:var(--brand-d); color:var(--card); } .pushask .pa-no { background:var(--soft); color:var(--sub); }
 </style>
 </head>
 <body>
@@ -356,5 +395,6 @@
 <script src="news.js"></script>
 <script src="onair.js"></script>
 <script src="weather.js"></script>
+<script src="notice.js"></script>
 </body>
 </html>
