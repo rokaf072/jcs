@@ -144,12 +144,26 @@ async function limited(fn) {
   photoBusy++;
   try { return await fn(); } finally { photoBusy--; const n = photoWait.shift(); if (n) n(); }
 }
+// 같은 사람이 직함을 조금 다르게 적어도(정치쇼↔뉴스직격 등) 예전에 찾은 사진을 그대로 씀
+function autoByName(name) {
+  let best = null;
+  try {
+    const pre = 'gb:auto:' + name + '|';
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i); if (!k || !k.startsWith(pre)) continue;
+      const v = JSON.parse(localStorage.getItem(k) || 'null');
+      if (v && v.url && (!best || (v.at || 0) > (best.at || 0))) best = v;
+    }
+  } catch (e) {}
+  return best;
+}
 async function getPhoto(g, onUpdate) {
   if (store.get('none:' + g.name)) return { url: '' };   // 사용자가 지운 사진은 자동으로 다시 채우지 않음
   const manual = store.get('manual:' + g.name);
   if (manual) return manual;
   const key = 'auto:' + g.name + '|' + g.role;
-  const cached = store.get(key);
+  let cached = store.get(key);
+  if (!cached || !cached.url) { const alt = autoByName(g.name); if (alt) { cached = { ...alt }; store.set(key, cached); } }   // 직함이 조금 달라도 같은 이름 사진 그대로
   if (cached && Date.now() - cached.at < (cached.url ? 14 * 86400000 : 6 * 3600000)) return cached;   // 찾은 사진은 2주 유지
   if (!kakaoKey()) return cached || { url: '' };
   const myGen = photoGen;
@@ -769,7 +783,7 @@ function drawThumb(ph, rec, name) {
 }
 async function knownPhoto(name, role) {   // → { url, crop, cx, cy }
   const m = store.get('manual:' + name); if (m && m.url) return m;
-  const a = store.get('auto:' + name + '|' + role); return a && a.url ? a : null;
+  const a = store.get('auto:' + name + '|' + role); return a && a.url ? a : autoByName(name);
 }
 // ───────── 다른 앱에서 [공유]로 보낸 사진 받기 ─────────
 async function sharedToDataUrl(blob) {
