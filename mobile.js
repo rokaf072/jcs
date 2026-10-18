@@ -50,7 +50,7 @@ async function fetchPost(p) {
       const d = j.Response_Data_For_Detail; if (!d) throw new Error('본문을 읽지 못했어요.');
       return { body: htmlToText(d.CONTENT), title: htmlToText(d.TITLE), registered: (d.REG_DATE || '').slice(0, 16).replace(/-/g, '.'), url: viewUrl(d.NO) };
     }));
-    const post = { date: p.date, updated: p.updated, title: ds.map((d) => d.title).join(' / '), body: ds.map((d) => d.body).join('\n\n──────────\n\n'), registered: ds[ds.length - 1].registered, url: ds[0].url, ...mergeJYJ(ds), fetchedAt: Date.now() };
+    const post = { date: p.date, updated: p.updated, title: ds.map((d) => d.title).join(' / '), body: ds.map((d) => d.body).join('\n\n──────────\n\n'), registered: ds[ds.length - 1].registered, url: ds[0].url, ...mergeJYJ(ds), pv: PARSER_V, fetchedAt: Date.now() };
     store.set('post:' + p.date, post);
     return post;
   }
@@ -58,7 +58,7 @@ async function fetchPost(p) {
   const d = j.Response_Data_For_Detail;
   if (!d) throw new Error('본문을 읽지 못했어요.');
   const body = htmlToText(d.CONTENT), title = htmlToText(d.TITLE);
-  const post = { date: p.date, updated: p.updated, title, body, registered: (d.REG_DATE || '').slice(0, 16).replace(/-/g, '.'), url: viewUrl(d.NO), ...parseBody(body, title), fetchedAt: Date.now() };
+  const post = { date: p.date, updated: p.updated, title, body, registered: (d.REG_DATE || '').slice(0, 16).replace(/-/g, '.'), url: viewUrl(d.NO), ...parseBody(body, title), pv: PARSER_V, fetchedAt: Date.now() };
   store.set('post:' + p.date, post);
   return post;
 }
@@ -370,7 +370,7 @@ async function show(date, force = false, skipKey = '') {
     const p = posts.find((x) => x.date === date);
     if (!p) { if (date === todayStr()) return renderWaiting(date); throw new Error('해당 날짜 글이 없어요.'); }
     let post = store.get('post:' + date);
-    if (force || !post || (p.updated && post.updated !== p.updated)) post = await fetchPost(p);
+    if (force || !post || post.pv !== PARSER_V || (p.updated && post.updated !== p.updated)) post = await fetchPost(p);
     fillSelect(date);
     if (!post.parts.length && date === todayStr()) return renderWaiting(date, '오늘 글은 올라왔는데 출연자 명단이 아직 비어 있어요. 작가가 작성 중일 수 있어요. 자동으로 다시 확인할게요.');
     if (skipKey && skipKey === date + '|' + (post.updated || '')) return true;   // 이미 저장본으로 그려 둔 것과 같음
@@ -409,7 +409,7 @@ async function init(force = false) {
     let quick = '';
     if (!force) {
       const tgt = keep || todayStr(), qp = store.get('post:' + tgt);
-      if (qp && qp.parts && qp.parts.length && posts.some((p) => p.date === tgt)) { fillSelect(tgt); render(qp); restoreScroll(keepY); quick = tgt + '|' + (qp.updated || ''); }
+      if (qp && qp.pv === PARSER_V && qp.parts && qp.parts.length && posts.some((p) => p.date === tgt)) { fillSelect(tgt); render(qp); restoreScroll(keepY); quick = tgt + '|' + (qp.updated || ''); }
     }
     const [, pulled] = await Promise.all([
       fetchList().catch((e) => { if (!posts.length) throw e; status('인터넷 연결을 확인하세요. 저장된 내용을 보여드려요.', true); }),
@@ -668,7 +668,7 @@ function ensureIndex(onProgress) {
       if (items.length < 16) break;
     }
     // 2) 아직 색인에 없거나 고쳐진 글만 본문 읽기 (4개씩 동시에)
-    const todo = list.filter((x) => !idx[x.NO] || idx[x.NO].u !== (x.UPDATE_DATE || x.REG_DATE));
+    const todo = list.filter((x) => !idx[x.NO] || idx[x.NO].u !== (x.UPDATE_DATE || x.REG_DATE) || idx[x.NO].v !== PARSER_V);
     let done = 0;
     const work = async (x) => {
       try {
@@ -676,7 +676,7 @@ function ensureIndex(onProgress) {
         const d = j.Response_Data_For_Detail;
         if (d) {
           const title = htmlToText(d.TITLE || x.TITLE);
-          idx[x.NO] = { d: dateFromTitle(title) || (x.REG_DATE || '').slice(0, 10), t: title, u: x.UPDATE_DATE || x.REG_DATE, g: compactGuests(progParse(htmlToText(d.CONTENT || ''), title)) };
+          idx[x.NO] = { d: dateFromTitle(title) || (x.REG_DATE || '').slice(0, 10), t: title, u: x.UPDATE_DATE || x.REG_DATE, v: PARSER_V, g: compactGuests(progParse(htmlToText(d.CONTENT || ''), title)) };
         }
       } catch (e) {}
       done++;
