@@ -91,7 +91,7 @@ function parseJYJ(body, title) {
   }
   if (!raw && tc) raw = tc[2];
   if (!raw && !tc) { const m = (title || '').replace(/^\d{6}\s*(\([^)]*\))?\s*/, ''); raw = m; }
-  const guests = raw.split(/\s*[,，、/]\s*|\s+및\s+/).map((s) => s.trim()).filter((s) => s && /[가-힣]{2}/.test(s))
+  const guests = raw.split(/\s*[,，、/]\s*|\s+및\s+/).map((s) => s.trim()).filter((s) => s && /[가-힣]{2}/.test(s) && !/[?？]/.test(s))
     .map((s) => splitGuest(s, cands)).filter((g) => g.name && g.name !== PROG.host);
   // 주제: 메타 줄이 아닌 첫 문장 (있으면)
   let topic = '';

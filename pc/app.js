@@ -1207,7 +1207,7 @@ $('#prefetch').onclick = async () => {
     const all = await chrome.storage.local.get(null);
     // 예전 방식으로 찾은 사진도 새 방식으로 다시 확인
     const haveV2 = new Set(Object.entries(all).filter(([k, v]) => k.startsWith('photo7:') && v && v.url && v.ver === 2 && !v.temp).map(([k]) => k.slice(7).split('|')[0]));   // 직함만 다른 같은 사람은 다시 찾지 않음
-    const todo = [...guests.values()].filter((g) => !all['manual:' + g.name] && !all['none:' + g.name] && !haveV2.has(g.name));
+    const todo = [...guests.values()].filter((g) => !all['manual:' + g.name] && !all['none:' + g.name] && !all['notguest:' + g.name] && !haveV2.has(g.name));
     let done = 0, found = 0;
     const total = todo.length;
     btn.textContent = `사진 찾는 중 0/${total}`;
@@ -1969,7 +1969,7 @@ async function missingList() {
     people.set(name, o);
   }
   const has = (o) => all['manual:' + o.name] || all[`manual:${o.name}|${o.role}`] || Object.keys(all).some((k) => k.startsWith('photo7:' + o.name + '|') && all[k] && all[k].url);
-  return [...people.values()].filter((o) => all['none:' + o.name] || !has(o))
+  return [...people.values()].filter((o) => !all['notguest:' + o.name] && (all['none:' + o.name] || !has(o)))
     .map((o) => ({ ...o, deleted: !!all['none:' + o.name] }))
     .sort((a, b) => (b.n - a.n) || b.last.localeCompare(a.last));
 }
@@ -2000,7 +2000,10 @@ async function openMissing() {
         if (!document.body.contains(ov)) clearInterval(t);
       }, 800);
     };
-    btns.append(pickB);
+    const notB = el('button', 'rno', '출연자 아님');   // 코너 제목·설문 문구 등이 사람 이름처럼 잡힌 경우 → 목록에서 영구히 빼기
+    notB.title = '사람이 아니거나 사진이 필요 없으면 눌러서 이 목록에서 빼요';
+    notB.onclick = async () => { await store.set('notguest:' + g.name, Date.now()); card.remove(); missingCount(); };
+    btns.append(pickB, notB);
     const q = encodeURIComponent(`${g.name} ${g.role}`);
     const look = el('a', 'rlook', '검색해서 확인'); look.href = '#'; look.onclick = (e) => { e.preventDefault(); openTab('https://search.naver.com/search.naver?where=image&query=' + q); };
     const meta = `출연 ${g.n}회 · 최근 ${+g.last.slice(5, 7)}/${+g.last.slice(8, 10)}` + (g.deleted ? ' · 틀림으로 지움' : '');

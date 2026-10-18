@@ -1,13 +1,13 @@
 {
-"version": "3.38.0",
+"version": "3.39.0",
 "files": [
 {
 "p": "app.html",
-"h": "5173c1a6c56f085fadc8bb6b7ed5560d1897c157"
+"h": "effb76a51a5738cc6ec64c4b8f677f8fcbf8fa88"
 },
 {
 "p": "app.js",
-"h": "6112c20a48eed23bf6ff1821c2c8769662f0d5ef"
+"h": "994e9df21f99a29f4f084e0f2da816a153da56ee"
 },
 {
 "p": "app.webmanifest",
@@ -47,7 +47,7 @@
 },
 {
 "p": "manifest.json",
-"h": "2c431360df473735ce876c8fdb87455c8fbe086f"
+"h": "d029b4ce59a1f6074c173f49c59a08d0b60e737c"
 },
 {
 "p": "news.js",
@@ -55,11 +55,11 @@
 },
 {
 "p": "parser.js",
-"h": "0de76d4cd3ac3928d8a1cd8be1ee3c75cd1281f4"
+"h": "677bbf978d5e360e68acb9d03367279b2c2352b7"
 },
 {
 "p": "programs.js",
-"h": "d1508732aa51a988b633c2045483111dbc67ced8"
+"h": "e356736869e477091e445774d474e40e9b817807"
 },
 {
 "p": "rails.js",

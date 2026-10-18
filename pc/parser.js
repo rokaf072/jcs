@@ -7,7 +7,7 @@ const ROLE_WORDS = /(기자|평론가|의원|위원|논설위원|교수|변호�
 const ORG_WORDS = /(일보|신문|뉴스|저널|경제|방송|일간|통신|미디어|리서치|연구소|연구원|재단|협회|대학교|위원회)$|^(한겨레|프레시안|데일리안|머니투데이|오마이뉴스|시사인|뉴스핌|뉴시스|노컷뉴스|국회|청와대|대통령실)$/;
 // 정당 이름 (작가가 '국민의힘 김경율 전 비대위원'처럼 정당을 앞에 쓰는 경우가 많음)
 const PARTY_WORDS = /^(국민의힘|더불어민주당|민주당|조국혁신당|개혁신당|진보당|정의당|녹색정의당|기본소득당|사회민주당|새로운미래|국민의당|자유통일당|무소속|여당|야당|민주|국힘|혁신당)$|(?:당|의힘)$/;
-const PARSER_V = 2;   // 해석 방식이 바뀌면 숫자를 올림 → 저장해 둔 글을 다시 해석
+const PARSER_V = 3;   // 해석 방식이 바뀌면 숫자를 올림 → 저장해 둔 글을 다시 해석
 const isPersonTok = (t) => /^[가-힣]{2,4}$/.test(t) && !ORG_WORDS.test(t) && !ROLE_WORDS.test(t) && !PARTY_WORDS.test(t);
 
 function nameCandidates(title, body) {
@@ -61,6 +61,11 @@ function parseBody(body, title) {
     const cm = line.match(/^\[([^\]]+)\]\s*(.*)$/);
     if (cm) { newCorner(cm[1].trim()); if (cm[2]) corner.topic = cm[2]; continue; }
     if (/^[-–—·•]\s*\S/.test(line)) {
+      if (/[?？]/.test(line)) {   // '- 국민이 바라는 추석 선물은?' 같은 질문·설문 줄은 사람이 아니라 주제
+        if (!corner) newCorner('');
+        corner.topic = (corner.topic ? corner.topic + ' ' : '') + line.replace(/^[-–—·•]\s*/, '');
+        continue;
+      }
       if (!corner) newCorner('');
       corner.guests.push(splitGuest(line, cands));
       continue;
