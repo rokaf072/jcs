@@ -27,7 +27,7 @@
       const ov = document.createElement('div'); ov.className = 'gateov';
       const box = document.createElement('div'); box.className = 'gatebox';
       const open = acc && acc.hash && acc.from && acc.until && today() >= acc.from && today() <= acc.until;
-      box.innerHTML = `<div class="gatelogo">📻</div><h2>김태현의 정치쇼 출연자</h2>`;
+      box.innerHTML = `<div class="gatelogo">📻</div><h2>${typeof PROG !== 'undefined' ? PROG.name : '김태현의 정치쇼'} 출연자</h2>`;
       const msg = document.createElement('p'); msg.className = 'gatemsg';
       if (!acc) msg.textContent = '인터넷에 연결한 뒤 다시 열어 주세요.';
       else if (!open) msg.innerHTML = '지금은 <b>가입 기간이 아니에요.</b><br>관리자에게 문의해 주세요.';

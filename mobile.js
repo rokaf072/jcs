@@ -2,16 +2,16 @@
 // 출연자 명단: SBS 게시판 API 직접 호출 (SBS가 외부 호출을 허용함)
 // 사진: 다음(카카오) 이미지 검색 + 얼굴 대조. 네이버·구글은 휴대폰 브라우저에서 직접 읽을 수 없어 제외.
 
-const LIST_URL = 'https://programs.sbs.co.kr/radio/lchshow/board/65364';
+const LIST_URL = PROG.listUrl;   // programs.js: 지금 고른 프로그램(정치쇼/뉴스직격)
 const API = 'https://api.board.sbs.co.kr/bbs/V2.0/basic/board';
-const BOARD = 'lchshow_02';
+let BOARD = PROG.board;   // 뉴스직격은 처음에 찾아서 기억
 const viewUrl = (no) => `${LIST_URL}/?cmd=view&board_no=${no}`;
 // 화면에 없는 버튼이 있어도(예: 예전 index.html) 멈추지 않도록 빈 요소로 대신함
 const $ = (s) => document.querySelector(s) || document.createElement('div');
 const store = {
-  get(k) { try { const v = localStorage.getItem('gb:' + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
-  set(k, v) { try { localStorage.setItem('gb:' + k, JSON.stringify(v)); } catch (e) {} },
-  del(k) { try { localStorage.removeItem('gb:' + k); } catch (e) {} },
+  get(k) { try { const v = localStorage.getItem('gb:' + progKey(k)); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('gb:' + progKey(k), JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem('gb:' + progKey(k)); } catch (e) {} },
 };
 const kakaoKey = () => store.get('kakaoKey') || '';
 
@@ -37,14 +37,23 @@ function htmlToText(html) {
 }
 async function fetchList() {
   status('SBS 게시판 확인 중…');
-  const j = await getJsonp(`${API}/lists?board_code=${BOARD}&offset=0&limit=16&action_type=callback&callback=boardListCallback_${BOARD}`);
-  posts = (j.list || []).filter((x) => x.DELETED !== 'Y')
-    .map((x) => ({ no: x.NO, title: x.TITLE, updated: x.UPDATE_DATE || x.REG_DATE || '', date: dateFromTitle(x.TITLE) || (x.REG_DATE || '').slice(0, 10) }))
-    .filter((p) => p.date);
+  try { BOARD = await progBoard(getJsonp); } catch (e) { throw e; }
+  let j; try { j = await getJsonp(`${API}/lists?board_code=${BOARD}&offset=0&limit=${PROG.limit}&action_type=callback&callback=boardListCallback_${BOARD}`); } catch (e) { if (PROG.multi) progForgetBoard(); throw e; }
+  posts = progPosts(j.list || [], (x) => ({ no: x.NO, title: x.TITLE, updated: x.UPDATE_DATE || x.REG_DATE || '', date: dateFromTitle(x.TITLE) || (x.REG_DATE || '').slice(0, 10) }));
   store.set('posts', posts);
 }
 async function fetchPost(p) {
   status(`${prettyDate(p.date)} 방송내용 읽는 중…`);
+  if (p.nos) {   // 뉴스직격: 그날 올라온 글(코너별)을 모두 읽어 합침
+    const ds = await Promise.all(p.nos.map(async (no) => {
+      const j = await getJsonp(`${API}/detail/${no}?action_type=callback&board_code=${BOARD}&callback=boardViewCallback_${BOARD}`);
+      const d = j.Response_Data_For_Detail; if (!d) throw new Error('본문을 읽지 못했어요.');
+      return { body: htmlToText(d.CONTENT), title: htmlToText(d.TITLE), registered: (d.REG_DATE || '').slice(0, 16).replace(/-/g, '.'), url: viewUrl(d.NO) };
+    }));
+    const post = { date: p.date, updated: p.updated, title: ds.map((d) => d.title).join(' / '), body: ds.map((d) => d.body).join('\n\n──────────\n\n'), registered: ds[ds.length - 1].registered, url: ds[0].url, ...mergeJYJ(ds), fetchedAt: Date.now() };
+    store.set('post:' + p.date, post);
+    return post;
+  }
   const j = await getJsonp(`${API}/detail/${p.no}?action_type=callback&board_code=${BOARD}&callback=boardViewCallback_${BOARD}`);
   const d = j.Response_Data_For_Detail;
   if (!d) throw new Error('본문을 읽지 못했어요.');
@@ -323,12 +332,12 @@ function fillSelect(selected) {
 }
 function waitingMessage(date) {
   const dow = new Date(date + 'T00:00:00').getDay();
-  if (dow === 0 || dow === 6) return { head: '오늘은 주말이에요', text: '김태현의 정치쇼는 월~금 방송이라 오늘은 출연자 글이 없어요.', auto: false };
+  if (dow === 0 || dow === 6) return { head: '오늘은 주말이에요', text: `${PROG.nameIs} 월~금 방송이라 오늘은 출연자 글이 없어요.`, auto: false };
   const n = new Date(), hm = n.getHours() * 60 + n.getMinutes();
-  if (hm < 6 * 60 + 20) return { head: '아직 작가님이 오늘 출연자를 올리지 않았어요', text: '이 화면을 열어두면 자동으로 확인해서, 올라오는 즉시 보여드릴게요.', auto: true };
-  if (hm < 7 * 60 + 5) return { head: '아직 작가님이 오늘 출연자를 올리지 않았어요', text: '평소보다 조금 늦어지고 있어요. 방송 시작(07:05) 전까지 자동으로 계속 확인할게요.', auto: true };
-  if (hm < 9 * 60) return { head: '방송이 시작됐는데 아직 출연자 글이 없어요', text: '작가가 많이 늦어지고 있어요. 자동 확인은 계속하고 있고, 급하면 [원문]으로 게시판을 직접 확인해 보세요.', auto: true };
-  return { head: '오늘 출연자 글이 올라오지 않았어요', text: '방송 시간(07:05~09:00)은 지났어요. 결방이나 특집 편성일 수 있어요.', auto: true };
+  if (hm < PROG.usual) return { head: '아직 작가님이 오늘 출연자를 올리지 않았어요', text: '이 화면을 열어두면 자동으로 확인해서, 올라오는 즉시 보여드릴게요.', auto: true };
+  if (hm < PROG.on) return { head: '아직 작가님이 오늘 출연자를 올리지 않았어요', text: `평소보다 조금 늦어지고 있어요. 방송 시작(${hhmmStr(PROG.on)}) 전까지 자동으로 계속 확인할게요.`, auto: true };
+  if (hm < PROG.off) return { head: '방송이 시작됐는데 아직 출연자 글이 없어요', text: '작가가 많이 늦어지고 있어요. 자동 확인은 계속하고 있고, 급하면 [원문]으로 게시판을 직접 확인해 보세요.', auto: true };
+  return { head: '오늘 출연자 글이 올라오지 않았어요', text: `방송 시간(${PROG_TIME})은 지났어요. 결방이나 특집 편성일 수 있어요.`, auto: true };
 }
 function renderWaiting(date, note) {
   current = null;
@@ -336,10 +345,10 @@ function renderWaiting(date, note) {
   const m = waitingMessage(date), main = $('#main'); main.textContent = '';
   const box = el('div', 'waiting');
   const t = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-  box.append(el('div', 'whead', m.head), el('div', 'wtext', note || m.text), el('div', 'wtime', m.auto ? `마지막 확인 ${t} · ${(() => { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); return hm >= 360 && hm < 425 ? '30초' : '3분'; })()}마다 자동 확인 중` : `마지막 확인 ${t}`));
+  box.append(el('div', 'whead', m.head), el('div', 'wtext', note || m.text), el('div', 'wtime', m.auto ? `마지막 확인 ${t} · ${(() => { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); return hm >= PROG.fastFrom && hm < PROG.on ? '30초' : '3분'; })()}마다 자동 확인 중` : `마지막 확인 ${t}`));
   main.append(box); status('');
   clearTimeout(waitTimer);
-  if (m.auto && date === todayStr()) { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); waitTimer = setTimeout(() => init(true), hm >= 360 && hm < 425 ? 30000 : 3 * 60000); }
+  if (m.auto && date === todayStr()) { const n = new Date(), hm = n.getHours() * 60 + n.getMinutes(); waitTimer = setTimeout(() => init(true), hm >= PROG.fastFrom && hm < PROG.on ? 30000 : 3 * 60000); }
 }
 async function show(date, force = false, skipKey = '') {
   clearTimeout(waitTimer);
@@ -639,7 +648,7 @@ function ensureIndex(onProgress) {
     const list = [];
     for (let off = 0; off < INDEX_MAX; off += 16) {
       indexProgress = `지난 방송 목록 확인 중 ${list.length}개…`; onProgress && onProgress();
-      let j; try { j = await getJsonp(`${API}/lists?board_code=${BOARD}&offset=${off}&limit=16&action_type=callback&callback=boardListCallback_${BOARD}`); } catch (e) { break; }
+      let j; try { BOARD = await progBoard(getJsonp); j = await getJsonp(`${API}/lists?board_code=${BOARD}&offset=${off}&limit=16&action_type=callback&callback=boardListCallback_${BOARD}`); } catch (e) { break; }
       const items = (j.list || []).filter((x) => x.DELETED !== 'Y');
       list.push(...items);
       if (items.length < 16) break;
@@ -653,7 +662,7 @@ function ensureIndex(onProgress) {
         const d = j.Response_Data_For_Detail;
         if (d) {
           const title = htmlToText(d.TITLE || x.TITLE);
-          idx[x.NO] = { d: dateFromTitle(title) || (x.REG_DATE || '').slice(0, 10), t: title, u: x.UPDATE_DATE || x.REG_DATE, g: compactGuests(parseBody(htmlToText(d.CONTENT || ''), title)) };
+          idx[x.NO] = { d: dateFromTitle(title) || (x.REG_DATE || '').slice(0, 10), t: title, u: x.UPDATE_DATE || x.REG_DATE, g: compactGuests(progParse(htmlToText(d.CONTENT || ''), title)) };
         }
       } catch (e) {}
       done++;
