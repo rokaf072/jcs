@@ -73,15 +73,16 @@ if ($NativeHost) {
 if ($Setup) {
   Write-Host ''
   # 예전 '15분마다 확인' 예약이 있으면 지움 (이제 단추를 누를 때만 업데이트)
-  schtasks /Delete /F /TN 'JCS-Guest-Board-Update' 2>&1 | Out-Null
+  cmd /c "schtasks /Delete /F /TN JCS-Guest-Board-Update >nul 2>&1"   # 없으면 그냥 넘어감
   $bat = Join-Path $dir 'jcs-host.bat'
   $json = Join-Path $dir 'jcs-host.json'
   $m = [ordered]@{ name = $hostName; description = '정치쇼 출연자 업데이트 도우미'; path = $bat; type = 'stdio'; allowed_origins = @("chrome-extension://$extId/") }
   [IO.File]::WriteAllText($json, ($m | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
   $ok = $true
   foreach ($b in @('Google\Chrome', 'Microsoft\Edge')) {
-    $out = reg add ("HKCU\Software\$b\NativeMessagingHosts\$hostName") /ve /t REG_SZ /d $json /f 2>&1
-    if ($LASTEXITCODE -ne 0 -and $b -eq 'Google\Chrome') { $ok = $false; Write-Host ('  ' + ($out -join ' ')) }
+    $key = "HKCU:\Software\$b\NativeMessagingHosts\$hostName"
+    try { New-Item -Path $key -Force | Out-Null; Set-Item -LiteralPath $key -Value $json }
+    catch { if ($b -eq 'Google\Chrome') { $ok = $false; Write-Host ('  등록하지 못했어요: ' + $_.Exception.Message) } }
   }
   if ($ok) {
     Write-Host '  ✔ 업데이트 기능을 켰어요.' -ForegroundColor Green
