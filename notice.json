@@ -1,11 +1,11 @@
 {
- "id": "t1792320681850",
+ "id": "t1792321308737",
  "test": true,
  "to": "https://fcm.googleapis.com/fcm/send/ebnthbYtlHc:APA91bFSkp5YYvqMqVVuwgBK0EKg-m_w2u5sc_rD4z7g3lnjhws0aQ8n1F0KDtZgWE2-mbyj-yMGr8XT-laBR960cVULohl3fzS18T3adP3wpXKIHhbtp3Vc9bA3HnXBbzI9tfdtH_Bh",
- "title": "잠바입기",
- "body": "날씨가 추우니 잠바입고 근믄",
+ "title": "잠바를 입으세요",
+ "body": "날씨가 추우니 잠바를 입고 근무하세요",
  "level": "urgent",
- "at": 1792320681850,
+ "at": 1792321308737,
  "from": "관리자",
- "until": 1792324281850
+ "until": 1792324908737
 }
