@@ -3,6 +3,7 @@
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+const GNLOG = { ok: 0, fail: 0, codes: {} };
 const GN = (q) => 'https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=ko&gl=KR&ceid=KR:ko';
 const PAPERS = [
   { name: '조선일보', site: 'chosun.com', feeds: ['https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml', 'https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml'] },
@@ -39,6 +40,7 @@ const FEEDLOG = {};   // 신문사 RSS 상태 기록 (news.json의 diag.feeds �
 async function getText(url, opt = {}) {
   try {
     const r = await fetch(url, { ...opt, headers: { 'User-Agent': UA, 'Accept-Language': 'ko-KR,ko;q=0.9', 'Accept': 'application/rss+xml, application/xml, text/xml, text/html, */*', ...(opt.headers || {}) }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    if (/news\.google\.com\/rss\/search/.test(url)) { GNLOG[r.ok ? 'ok' : 'fail']++; GNLOG.codes[r.status] = (GNLOG.codes[r.status] || 0) + 1; }
     if (opt.log) FEEDLOG[url] = { st: r.status, to: r.url !== url ? r.url : undefined, ct: (r.headers.get('content-type') || '').slice(0, 40) };
     if (!r.ok) return '';
     const buf = Buffer.from(await r.arrayBuffer());
@@ -178,6 +180,19 @@ async function fetchSummary(item) {
 
 // ── 실행 ──
 const lists = await Promise.all(PAPERS.map((p) => loadPaper(p).catch(() => [])));
+// 구글 뉴스·신문사가 잠깐 막아서 이번에 기사가 확 줄어든 신문은 → 직전 파일의 기사를 그대로 이어서 보여줌 (36시간 지난 기사는 뺌)
+const carried = {};
+try {
+  const old = existsSync('news.json') ? JSON.parse(readFileSync('news.json', 'utf8')) : null;
+  if (old && Date.now() - (old.at || 0) < 6 * 3600e3) PAPERS.forEach((p, n) => {
+    const was = (old.items || []).filter((i) => i.paper === p.name && Date.now() - (i.t || 0) < MAX_AGE);
+    if (was.length < 5 || lists[n].length >= was.length * 0.4) return;
+    const have = new Set(lists[n].map((i) => keyOf(i.title)));
+    const add = was.filter((i) => !have.has(keyOf(i.title))).map(({ paper, title, link, desc, t, eco, sbsQ }) => ({ paper, title, link, desc, t, eco, sbsQ }));
+    lists[n] = [...lists[n], ...add].sort((a, b) => b.t - a.t);
+    carried[p.name] = add.length;
+  });
+} catch (e) {}
 const items = lists.flat();
 if (!items.length) { console.log('기사를 하나도 못 받아서 이전 파일을 그대로 둠'); process.exit(0); }
 
@@ -210,5 +225,7 @@ await Promise.all(Array.from({ length: 6 }, async () => {
 for (const i of items) { const s = prev[keyOf(i.title)]; if (s) Object.assign(i, s); }
 diag.withSum = items.filter((i) => i.sum).length;
 diag.feeds = FEEDLOG;
+diag.carried = carried;
+diag.gn = GNLOG;
 console.log('기사 수', Object.fromEntries(PAPERS.map((p, n) => [p.name, lists[n].length])), '요약', diag);
 writeFileSync('news.json', JSON.stringify({ at: Date.now(), diag, items }));
