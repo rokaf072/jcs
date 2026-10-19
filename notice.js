@@ -172,7 +172,7 @@
   function iosGuide() {
     alert('아이폰은 앱을 홈 화면에 추가해야 알림을 받을 수 있어요.\n\n1) 사파리 아래 [공유 □↑] 버튼\n2) [홈 화면에 추가]\n3) 홈 화면의 정치쇼 아이콘으로 열고 [🔔 알림 받기]를 눌러 주세요.\n(가입 코드는 다시 안 물어봐요)');
   }
-  // 처음 열 때 한 번 권유 카드 (나중에 → 3일 뒤 다시)
+  // 처음 열 때 한 번 권유 카드 (나중에 → 다시 묻지 않음, 설정에서 언제든 켤 수 있음)
   async function askOnce() {
     if (window.jcsIsMember && !window.jcsIsMember()) return;
     let snooze = 0; try { snooze = +localStorage.getItem('jcsPushAsk') || 0; } catch (e) {}
@@ -190,8 +190,8 @@
     const yes = document.createElement('button'); yes.className = 'pa-yes'; yes.textContent = st === 'ios-home' ? '방법 보기' : '알림 받기';
     const no = document.createElement('button'); no.className = 'pa-no'; no.textContent = '나중에';
     const close = () => card.remove();
-    yes.onclick = async () => { close(); try { if (await subscribe()) alert('✔ 이제 중요 알림이 이 폰으로 와요.'); } catch (e) { alert('알림을 켜지 못했어요: ' + e.message); } };
-    no.onclick = () => { try { localStorage.setItem('jcsPushAsk', String(Date.now() + 3 * 864e5)); } catch (e) {} close(); };
+    yes.onclick = async () => { close(); try { localStorage.setItem('jcsPushAsk', String(Date.now() + 3650 * 864e5)); } catch (e) {} try { if (await subscribe()) alert('✔ 이제 중요 알림이 이 폰으로 와요.'); } catch (e) { alert('알림을 켜지 못했어요: ' + e.message); } };
+    no.onclick = () => { try { localStorage.setItem('jcsPushAsk', String(Date.now() + 3650 * 864e5)); } catch (e) {} close(); };
     card.append(yes, no); document.body.append(card);
   }
   // 알림을 눌러 앱이 열리면 → 큰 알림 화면

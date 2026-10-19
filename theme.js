@@ -3,9 +3,17 @@
   var t = 'dark';
   try { t = localStorage.getItem('jcsTheme') || 'dark'; } catch (e) {}
   var h = document.documentElement;
+  // 상단 상태바 색 = 화면 맨 위 색 (프로그램·밝은/어두운 모드에 맞춰서)
+  window.jcsBarColor = function (v) {
+    var jyj = false; try { jyj = localStorage.getItem('jcsProg') === 'jyj'; } catch (e) {}
+    v = v || h.dataset.theme || 'dark';
+    var c = v === 'dark' ? (jyj ? '#0a1222' : '#111419') : (jyj ? '#1f56b8' : '#3a9a8a');
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = c;
+    return c;
+  };
   function apply(v) {
     h.dataset.theme = v;
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) var jyj = false; try { jyj = localStorage.getItem('jcsProg') === 'jyj'; } catch (e) {} m.content = v === 'dark' ? (jyj ? '#0a1222' : '#111419') : (jyj ? '#1f56b8' : '#3a9a8a');
+    window.jcsBarColor(v);
     var b = document.getElementById('themeBtn'); if (b) b.textContent = v === 'dark' ? '☀' : '🌙';
   }
   apply(t);

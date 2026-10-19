@@ -179,7 +179,7 @@ const JYJ_COLORS = [
 function progTheme() {
   if (PROG.id !== 'jyj') return;
   for (const st of document.querySelectorAll('style')) { let t = st.textContent; for (const [a, b] of JYJ_COLORS) t = t.replace(a, b); st.textContent = t; }
-  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = '#1f56b8';
+  if (window.jcsBarColor) window.jcsBarColor();
   
 }
 // 휴대폰: 제목 대신 단추가 있으니 왼쪽에 프로그램 로고
