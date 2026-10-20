@@ -1,11 +1,11 @@
 {
- "id": "t1792321528607",
+ "id": "t1792459005797",
  "test": true,
- "to": "https://fcm.googleapis.com/fcm/send/ebnthbYtlHc:APA91bFSkp5YYvqMqVVuwgBK0EKg-m_w2u5sc_rD4z7g3lnjhws0aQ8n1F0KDtZgWE2-mbyj-yMGr8XT-laBR960cVULohl3fzS18T3adP3wpXKIHhbtp3Vc9bA3HnXBbzI9tfdtH_Bh",
- "title": "비상소집",
- "body": "조유연 내일 결석",
+ "to": "https://fcm.googleapis.com/fcm/send/dQgDac6XySY:APA91bFhHrescIE-6AXptG-vffHaZFxaHOaNH8Nd46Sr-0ITMzzqs4rgDy4u7Ekxp6P2UdhoiW8G1twTizJmQ-EDoEALPNx_tcQ_QYgI47_ud_wgf5o7AFAte-AX2-EALgDFPEZY-1vw",
+ "title": "잠바",
+ "body": "춥다",
  "level": "urgent",
- "at": 1792321528607,
+ "at": 1792459005797,
  "from": "관리자",
- "until": 1792325128607
+ "until": 1792462605797
 }
